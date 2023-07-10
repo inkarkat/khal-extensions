@@ -16,8 +16,63 @@ do
     esac
 done
 
+getFifo()
+{
+    local i tempFifo
+    for ((i = 0; i < 5; i++))
+    do
+	tempFifo="$(mktemp --dry-run --tmpdir="${XDG_RUNTIME_DIR:-/tmp}" "$(basename -- "$0")-XXXXXX" 2>/dev/null || echo "${XDG_RUNTIME_DIR:-/tmp}/$(basename -- "$0").$$$RANDOM")"
+	if mkfifo -m 600 "$tempFifo" 2>/dev/null; then	# mkfifo fails when the file already exists; this handles the race condition.
+	    printf %s "$tempFifo"
+	    return 0
+	fi
+    done
+    return 1
+}
+summarizeSetup()
+{
+    local summaryFifo; summaryFifo="$(getFifo)" || exit $?
+    exec 3<>"$summaryFifo"
+    rm -- "$summaryFifo" # Unlink the named pipe.
+
+    local startEndFifo; startEndFifo="$(getFifo)" || exit $?
+    exec 4<>"$startEndFifo"
+    rm -- "$startEndFifo" # Unlink the named pipe.
+}
+startEndPipeline()
+{
+    tee >(headtail -n 1 --duplicate-if-short | field 1 >&4)
+}
+summarizePipeline()
+{
+    tee >(sumField 3 >&3)
+}
+summarizeProcessing()
+{
+    local IFS=$'\n' summarySeconds start end dateDiff range
+    read summarySeconds <&3
+    { read start; read end; } <&4
+    exec 3>&- 4>&-
+
+    if [ "$start" = "$end" ]; then
+	dateDiff='one day'
+	range="on $start"
+    else
+	dateDiff="$(datediff --output best-unit "$start" "$end")"
+	range="from $start until $end"
+    fi
+
+    printf -- '--\nTotal effort: %s over %s (%s)\n' "$(secondsToDuration --precision Uh -- "$summarySeconds")" "$dateDiff" "$range"
+}
+
+
+summarizeSetup
+
 khal-wrapper list "${khalArgs[@]}" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "$(date --date "${KHAL_GREP_DATERANGE:-3 months ago}" +%F)" today \
     | grep "${grepArgs[@]}" "$@" \
     | reldate --relative-to-first --difference \
-    | tee >(sumField 3 | secondsToDuration --precision Uh) \
+    | startEndPipeline \
+    | summarizePipeline \
     | fieldMap 3 '|secondsToDuration --unbuffered --width 6'
+
+summarizeProcessing
