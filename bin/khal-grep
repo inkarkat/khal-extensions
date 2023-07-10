@@ -2,6 +2,17 @@
 set -o pipefail
 shopt -qs extglob
 
+: ${KHAL_GREP_DATERANGE:=3 months ago}
+
+printUsage()
+{
+    cat <<HELPTEXT
+Show all events in the past ${KHAL_GREP_DATERANGE} that match PATTERN, followed
+by a summary of the total duration and date range in which they were scheduled.
+HELPTEXT
+    echo
+    printf 'Usage: [KHAL_GREP_DATERANGE=START_DATE] %q %s\n' "$(basename "$1")" '[KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
+}
 typeset -a grepArgs=()
 typeset -a khalArgs=()
 while [ $# -ne 0 ]
@@ -15,6 +26,10 @@ do
 	*)		grepArgs+=("$1"); shift;;
     esac
 done
+if [ ${#grepArgs[@]} -eq 0 -a $# -eq 0 ]; then
+    printUsage "$0" >&2
+    exit 2
+fi
 
 getFifo()
 {
@@ -68,7 +83,7 @@ summarizeProcessing()
 
 summarizeSetup
 
-khal-wrapper list "${khalArgs[@]}" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "$(date --date "${KHAL_GREP_DATERANGE:-3 months ago}" +%F)" today \
+khal-wrapper list "${khalArgs[@]}" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "$(date --date "${KHAL_GREP_DATERANGE:?}" +%F)" today \
     | grep "${grepArgs[@]}" "$@" \
     | reldate --relative-to-first --difference \
     | startEndPipeline \
