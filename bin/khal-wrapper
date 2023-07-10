@@ -18,6 +18,7 @@ export _khal_wrapper=true
 typeset -A pagerDisabledCommands=(
     [configure]=''
     [edit]=''
+    [fib-tally]=''
     [interactive]=''
 )
 
