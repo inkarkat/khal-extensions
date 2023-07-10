@@ -1,0 +1,7 @@
+#!/bin/bash
+set -o pipefail
+
+khal-wrapper list "$@" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' today eod \
+    | reldate --relative-to-first --difference \
+    | tee >(sumField 3 | secondsToDuration) \
+    | fieldMap 3 '|secondsToDuration --unbuffered --width 6'

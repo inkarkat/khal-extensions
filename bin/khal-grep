@@ -1,0 +1,23 @@
+#!/bin/bash
+set -o pipefail
+shopt -qs extglob
+
+typeset -a grepArgs=()
+typeset -a khalArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	-[ad])		khalArgs+=("$1" "${2?}"); shift; shift;;
+	--@(include-calendar|exclude-calendar))
+			khalArgs+=("$1" "${2?}"); shift; shift;;
+	--)		grepArgs+=("$1"); shift; break;;
+	*)		grepArgs+=("$1"); shift;;
+    esac
+done
+
+khal-wrapper list "${khalArgs[@]}" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "$(date --date "${KHAL_GREP_DATERANGE:-3 months ago}" +%F)" today \
+    | grep "${grepArgs[@]}" "$@" \
+    | reldate --relative-to-first --difference \
+    | tee >(sumField 3 | secondsToDuration --precision Uh) \
+    | fieldMap 3 '|secondsToDuration --unbuffered --width 6'
