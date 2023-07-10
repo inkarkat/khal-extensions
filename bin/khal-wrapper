@@ -1,0 +1,58 @@
+#!/bin/bash
+set -o pipefail
+shopt -qs extglob
+
+# Allow definition of khal aliases by putting an executable "khal-foo"
+# somewhere in the PATH. Add paging when outputting to the terminal, as khal
+# output can be long, and the command (nor my extensions) doesn't do that on its
+# own.
+
+if [ -z "${_khal_toterm+t}" ]; then
+    _khal_toterm=; [ -t 1 ] && _khal_toterm=true
+    export _khal_toterm
+fi
+typeset -a pager=("${PAGER:-less}" --RAW-CONTROL-CHARS); [ "$_khal_toterm" ] || pager=()
+[ -n "${_khal_wrapper+t}" ] && pager=()
+export _khal_wrapper=true
+
+typeset -A pagerDisabledCommands=(
+    [configure]=''
+    [edit]=''
+    [interactive]=''
+)
+
+pagerDisableCheck()
+{
+    local subCommand
+    if [ -n "$DOCKER_WRAPPER_DISABLE_PAGER" ]; then
+	typeset -a subCommands; read -r -d '' -a subCommands <<<"$DOCKER_WRAPPER_DISABLE_PAGER"
+	for subCommand in "${subCommands[@]}"; do
+	    pagerDisabledCommands["$subCommand"]=''
+	done
+    fi
+
+    for subCommand in "${!pagerDisabledCommands[@]}"
+    do
+	if contains "$subCommand" "$@"; then
+	    if [ -z "${pagerDisabledCommands["$subCommand"]}" ] \
+		|| containsGlob "${pagerDisabledCommands["$subCommand"]}" "$@"
+	    then
+		pager=()
+		return
+	    fi
+	fi
+    done
+}
+
+typeset khalAlias="khal-$1"
+if [ $# -eq 0 ]; then
+    eval 'command khal ${KHAL_DEFAULT_COMMAND:-ps}' "${pager:+|}" '"${pager[@]}"'
+elif type -t "$khalAlias" >/dev/null; then
+    pagerDisableCheck "$@"
+
+    shift; eval $khalAlias '"$@"' "${pager:+|}" '"${pager[@]}"'
+else
+    pagerDisableCheck "$@"
+
+    eval 'command khal "$@"' "${pager:+|}" '"${pager[@]}"'
+fi
