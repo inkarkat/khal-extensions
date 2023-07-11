@@ -23,7 +23,79 @@ end="${!#}"
 start="${*:(-2):1}"
 set -- "${@:1:$(($#-2))}"
 
+getFifo()
+{
+    local i tempFifo
+    for ((i = 0; i < 5; i++))
+    do
+	tempFifo="$(mktemp --dry-run --tmpdir="${XDG_RUNTIME_DIR:-/tmp}" "$(basename -- "$0")-XXXXXX" 2>/dev/null || echo "${XDG_RUNTIME_DIR:-/tmp}/$(basename -- "$0").$$$RANDOM")"
+	if mkfifo -m 600 "$tempFifo" 2>/dev/null; then	# mkfifo fails when the file already exists; this handles the race condition.
+	    printf %s "$tempFifo"
+	    return 0
+	fi
+    done
+    return 1
+}
+summarizeSetup()
+{
+    local summaryFifo; summaryFifo="$(getFifo)" || exit $?
+    exec 3<>"$summaryFifo"
+    rm -- "$summaryFifo" # Unlink the named pipe.
+
+    local startEndFifo; startEndFifo="$(getFifo)" || exit $?
+    exec 4<>"$startEndFifo"
+    rm -- "$startEndFifo" # Unlink the named pipe.
+}
+quadrantPipeline()
+{
+    tee >(
+	typeset -a fields=() quadrants=(0 0 0 0 0)
+	local q
+	while read -r -a fields
+	do
+	    [[ "${fields[3]}" =~ ^\[([1-4])\]$ ]] \
+		&& q="${BASH_REMATCH[1]}" \
+		|| q=0
+	    let quadrants[$q]+="${fields[2]}"
+	done
+	{
+	    printf '%d ' "${quadrants[@]}"
+	    printf '\n'
+	} >&4
+    )
+}
+summarizePipeline()
+{
+    tee >({ sumField 3 || echo 0; } >&3)
+}
+summarizeProcessing()
+{
+    local summarySeconds quadrants
+    read -r summarySeconds <&3
+    read -r -a quadrants <&4
+    exec 3>&- 4>&-
+
+    if [ $summarySeconds -eq 0 ]; then
+	printf >&2 'No events yet for %s..%s.\n' "$start" "$end"
+	return 99
+    fi
+
+    printf -- '--\n%s → [¹%s|²%s|³%s|⁴%s] ⁻%s\n' \
+	"$(secondsToDuration -- "$summarySeconds")" \
+	"$(secondsToDuration -- "${quadrants[1]}")" \
+	"$(secondsToDuration -- "${quadrants[2]}")" \
+	"$(secondsToDuration -- "${quadrants[3]}")" \
+	"$(secondsToDuration -- "${quadrants[4]}")" \
+	"$(secondsToDuration -- "${quadrants[0]}")"
+}
+
+
+summarizeSetup
+
 khal-wrapper list "$@" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "$start" "$end" \
     | reldate --relative-to-first --difference \
-    | tee >(sumField 3 | secondsToDuration | outputAndPrintf -- '--\n') \
+    | quadrantPipeline \
+    | summarizePipeline \
     | fieldMap 3 '|secondsToDuration --unbuffered --width 6'
+
+summarizeProcessing
