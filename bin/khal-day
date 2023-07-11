@@ -18,10 +18,5 @@ if [ $# -eq 0 ]; then
     printUsage "$0"
     exit 2
 fi >&2
-day="${!#}"
-[ $# -eq 0 ] && set -- || set -- "${@:1:$(($#-1))}"
 
-khal-wrapper list "$@" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "$day" eod \
-    | reldate --relative-to-first --difference \
-    | tee >(sumField 3 | secondsToDuration | outputAndPrintf -- '--\n') \
-    | fieldMap 3 '|secondsToDuration --unbuffered --width 6'
+exec khal-timespan "$@" eod
