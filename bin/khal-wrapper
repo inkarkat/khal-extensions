@@ -15,6 +15,18 @@ typeset -a pager=("${PAGER:-less}" --RAW-CONTROL-CHARS); [ "$_khal_toterm" ] || 
 [ -n "${_khal_wrapper+t}" ] && pager=()
 export _khal_wrapper=true
 
+typeset -a khalArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	-[ad])		khalArgs+=("$1" "${2?}"); shift; shift;;
+	--@(include-calendar|exclude-calendar))
+			khalArgs+=("$1" "${2?}"); shift; shift;;
+	--)		break;;
+	*)		break;;
+    esac
+done
+
 typeset -A pagerDisabledCommands=(
     [configure]=''
     [edit]=''
@@ -47,13 +59,13 @@ pagerDisableCheck()
 
 typeset khalAlias="khal-$1"
 if [ $# -eq 0 ]; then
-    eval 'command khal ${KHAL_DEFAULT_COMMAND:-ps}' "${pager:+|}" '"${pager[@]}"'
+    eval "exec \"\${BASH_SOURCE[0]}\" ${KHAL_DEFAULT_COMMAND:-td} \"\${khalArgs[@]}\""
 elif type -t "$khalAlias" >/dev/null; then
     pagerDisableCheck "$@"
 
-    shift; eval $khalAlias '"$@"' "${pager:+|}" '"${pager[@]}"'
+    shift; eval $khalAlias '"${khalArgs[@]}" "$@"' "${pager:+|}" '"${pager[@]}"'
 else
     pagerDisableCheck "$@"
 
-    eval 'command khal "$@"' "${pager:+|}" '"${pager[@]}"'
+    eval 'command khal "${khalArgs[@]}" "$@"' "${pager:+|}" '"${pager[@]}"'
 fi
