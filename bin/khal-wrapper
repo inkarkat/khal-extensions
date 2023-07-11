@@ -2,6 +2,8 @@
 set -o pipefail
 shopt -qs extglob
 
+: ${KHAL_DEFAULT_COMMAND=td}
+
 # Allow definition of khal aliases by putting an executable "khal-foo"
 # somewhere in the PATH. Add paging when outputting to the terminal, as khal
 # output can be long, and the command (nor my extensions) doesn't do that on its
@@ -58,8 +60,8 @@ pagerDisableCheck()
 }
 
 typeset khalAlias="khal-$1"
-if [ $# -eq 0 ]; then
-    eval "exec \"\${BASH_SOURCE[0]}\" ${KHAL_DEFAULT_COMMAND:-td} \"\${khalArgs[@]}\""
+if [ $# -eq 0 -a -n "$KHAL_DEFAULT_COMMAND" ]; then
+    eval "exec \"\${BASH_SOURCE[0]}\" $KHAL_DEFAULT_COMMAND \"\${khalArgs[@]}\""
 elif type -t "$khalAlias" >/dev/null; then
     pagerDisableCheck "$@"
 
