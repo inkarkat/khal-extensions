@@ -20,8 +20,12 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
-	--@(color|no-color))
-			khalMainArgs+=("$1"); shift;;
+
+	# Use color for grep, not khal, as that would likely interfere with the
+	# grepping.
+	--color)	shift; grepArgs+=(--color=always);;
+	--no-color)	shift; grepArgs+=(--color=never);;
+
 	-[vlc])		khalMainArgs+=("$1" "${2?}"); shift; shift;;
 	--@(verbosity|logfile|config))
 			khalMainArgs+=("$1" "${2?}"); shift; shift;;
@@ -89,7 +93,7 @@ summarizeProcessing()
 
 summarizeSetup
 
-khal-wrapper "${khalMainArgs[@]}" list "${khalListArgs[@]}" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "$(date --date "${KHAL_GREP_DATERANGE:?}" +%F)" today \
+khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "$(date --date "${KHAL_GREP_DATERANGE:?}" +%F)" today \
     | grep "${grepArgs[@]}" "$@" \
     | reldate --relative-to-first --difference \
     | startEndPipeline \
