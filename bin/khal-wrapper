@@ -13,18 +13,29 @@ if [ -z "${_khal_toterm+t}" ]; then
     _khal_toterm=; [ -t 1 ] && _khal_toterm=true
     export _khal_toterm
 fi
-typeset -a pager=("${PAGER:-less}" --RAW-CONTROL-CHARS); [ "$_khal_toterm" ] || pager=()
+typeset -a colorArg=(--color)
+typeset -a pager=("${PAGER:-less}" --RAW-CONTROL-CHARS)
+if [ ! "$_khal_toterm" ]; then
+    colorArg=()
+    pager=()
+fi
 [ -n "${_khal_wrapper+t}" ] && pager=()
 export _khal_wrapper=true
 
 typeset -a khalCommand=()
-typeset -a khalArgs=()
+typeset -a khalMainArgs=()
+typeset -a khalSubCommandArgs=()
 while [ $# -ne 0 ]
 do
     case "$1" in
-	-[ad])		khalArgs+=("$1" "${2?}"); shift; shift;;
+	--@(color|no-color))
+			colorArg=("$1"); shift;;
+	-[vlc])		khalMainArgs+=("$1" "${2?}"); shift; shift;;
+	--@(verbosity|logfile|config))
+			khalMainArgs+=("$1" "${2?}"); shift; shift;;
+	-[ad])		khalSubCommandArgs+=("$1" "${2?}"); shift; shift;;
 	--@(include-calendar|exclude-calendar))
-			khalArgs+=("$1" "${2?}"); shift; shift;;
+			khalSubCommandArgs+=("$1" "${2?}"); shift; shift;;
 	--)		break;;
 	-*)		break;;
 	*)		if [ ${#khalCommand[@]} -eq 0 ] \
@@ -72,15 +83,15 @@ pagerDisableCheck()
 typeset khalSubAlias="khal-$1-$2"
 typeset khalAlias="khal-$1"
 if [ $# -eq 0 -a -n "$KHAL_DEFAULT_COMMAND" ]; then
-    eval "exec \"\${BASH_SOURCE[0]}\" $KHAL_DEFAULT_COMMAND \"\${khalArgs[@]}\""
+    eval "exec \"\${BASH_SOURCE[0]}\" $KHAL_DEFAULT_COMMAND \"\${khalSubCommandArgs[@]}\""
 elif type -t "$khalSubAlias" >/dev/null; then
     pagerDisableCheck "$1-$2" "$@"
 
-    shift; shift; eval $khalSubAlias '"${khalArgs[@]}" "$@"' "${pager:+|}" '"${pager[@]}"'
+    shift; shift; eval $khalSubAlias '"${khalSubCommandArgs[@]}" "$@"' "${pager:+|}" '"${pager[@]}"'
 elif type -t "$khalAlias" >/dev/null; then
     pagerDisableCheck "$@"
 
-    shift; eval $khalAlias '"${khalArgs[@]}" "$@"' "${pager:+|}" '"${pager[@]}"'
+    shift; eval $khalAlias '"${khalSubCommandArgs[@]}" "$@"' "${pager:+|}" '"${pager[@]}"'
 else
     pagerDisableCheck "$@"
 
@@ -88,5 +99,5 @@ else
     if [ $# -gt 0 ]; then
 	subCommand=("$1"); shift
     fi
-    eval 'command khal "${subCommand[@]}" "${khalArgs[@]}" "$@"' "${pager:+|}" '"${pager[@]}"'
+    eval 'command khal "${colorArg[@]}" "${khalMainArgs[@]}" "${subCommand[@]}" "${khalSubCommandArgs[@]}" "$@"' "${pager:+|}" '"${pager[@]}"'
 fi
