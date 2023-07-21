@@ -39,8 +39,8 @@ typeset -A pagerDisabledCommands=(
 pagerDisableCheck()
 {
     local subCommand
-    if [ -n "$DOCKER_WRAPPER_DISABLE_PAGER" ]; then
-	typeset -a subCommands; read -r -d '' -a subCommands <<<"$DOCKER_WRAPPER_DISABLE_PAGER"
+    if [ -n "$KHAL_WRAPPER_DISABLE_PAGER" ]; then
+	typeset -a subCommands; read -r -d '' -a subCommands <<<"$KHAL_WRAPPER_DISABLE_PAGER"
 	for subCommand in "${subCommands[@]}"; do
 	    pagerDisabledCommands["$subCommand"]=''
 	done
