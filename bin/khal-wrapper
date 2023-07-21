@@ -87,11 +87,11 @@ if [ $# -eq 0 -a -n "$KHAL_DEFAULT_COMMAND" ]; then
 elif type -t "$khalSubAlias" >/dev/null; then
     pagerDisableCheck "$1-$2" "$@"
 
-    shift; shift; eval $khalSubAlias '"${khalSubCommandArgs[@]}" "$@"' "${pager:+|}" '"${pager[@]}"'
+    shift; shift; eval $khalSubAlias '"${colorArg[@]}" "${khalMainArgs[@]}" "${khalSubCommandArgs[@]}" "$@"' "${pager:+|}" '"${pager[@]}"'
 elif type -t "$khalAlias" >/dev/null; then
     pagerDisableCheck "$@"
 
-    shift; eval $khalAlias '"${khalSubCommandArgs[@]}" "$@"' "${pager:+|}" '"${pager[@]}"'
+    shift; eval $khalAlias '"${colorArg[@]}" "${khalMainArgs[@]}" "${khalSubCommandArgs[@]}" "$@"' "${pager:+|}" '"${pager[@]}"'
 else
     pagerDisableCheck "$@"
 
