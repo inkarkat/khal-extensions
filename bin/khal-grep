@@ -3,6 +3,9 @@ set -o pipefail
 shopt -qs extglob
 
 : ${KHAL_GREP_DATERANGE:=3 months ago}
+: ${ENGINEERINGDAY_SECONDS:=$((6 * 3600))}
+: ${ENGINEERINGWEEK_SECONDS:=$((ENGINEERINGDAY_SECONDS * 5))}
+: ${ENGINEERING_PREFIX:=e}
 
 printUsage()
 {
@@ -87,7 +90,11 @@ summarizeProcessing()
 	range="from $start until $end"
     fi
 
-    printf -- '--\nTotal effort: %s over %s (%s)\n' "$(secondsToDuration --precision Uh -- "$summarySeconds")" "$dateDiff" "$range"
+    printf -- '--\nTotal effort: %s (%s) over %s (%s)\n' \
+	"$(WORKDAY_SECONDS=$ENGINEERINGDAY_SECONDS WORKWEEK_SECONDS=$ENGINEERINGWEEK_SECONDS WORK_PREFIX="$ENGINEERING_PREFIX" secondsToDuration --workday --precision Ud -- "$summarySeconds")" \
+	"$(secondsToDuration --precision Uh -- "$summarySeconds")" \
+	"$dateDiff" \
+	"$range"
 }
 
 
