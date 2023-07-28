@@ -1,0 +1,16 @@
+#!/bin/bash
+
+printUsage()
+{
+    cat <<HELPTEXT
+Show the status of the vdirsyncer service and timer that provides the data to khal.
+HELPTEXT
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-?|-h|--help]'
+}
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+esac
+
+
+exec systemctl --user status vdirsyncer.timer vdirsyncer.service

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+printUsage()
+{
+    cat <<HELPTEXT
+Trigger the vdirsyncer service now to obtain fresh calendar data.
+HELPTEXT
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-?|-h|--help]'
+}
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+esac
+
+exec systemctl --user start vdirsyncer.service
