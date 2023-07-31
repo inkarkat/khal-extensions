@@ -12,4 +12,5 @@ case "$1" in
     --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
 esac
 
-exec systemctl --user start vdirsyncer.service
+systemctl --user start vdirsyncer.service \
+    && systemctl-wait-for-run vdirsyncer.service
