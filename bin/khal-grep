@@ -69,11 +69,11 @@ summarizeSetup()
 }
 startEndPipeline()
 {
-    tee >(headtail -n 1 --duplicate-if-short | field 1 >&4)
+    tee >(headtail -n 1 --duplicate-if-short | field 1 | outputOrPrintf \\n\\n >&4)
 }
 summarizePipeline()
 {
-    tee >(sumField 3 >&3)
+    tee >(sumField 3 | outputOrPrintf \\n >&3)
 }
 summarizeProcessing()
 {
@@ -81,6 +81,8 @@ summarizeProcessing()
     read summarySeconds <&3
     { read start; read end; } <&4
     exec 3>&- 4>&-
+
+    [ -n "$summarySeconds" -a -n "$start" -a -n "$end" ] || return
 
     if [ "$start" = "$end" ]; then
 	dateDiff='one day'
