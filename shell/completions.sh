@@ -11,6 +11,7 @@ _khal_complete()
 	# Completing a sub-alias; delegate to its custom completion function (if
 	# available)
 	if type -t "$khalAlias" >/dev/null; then
+	    local KHAL_COMMAND="${COMP_WORDS[0]}"   # Allow access to the original command, as COMP_WORDS[0] gets overwritten.
 	    COMP_WORDS=("khal-${COMP_WORDS[1]}-${COMP_WORDS[2]}" "${COMP_WORDS[@]:3}")
 	    let COMP_CWORD-=2
 	    "$khalAlias" "${COMP_WORDS[0]}" "${COMP_WORDS[COMP_CWORD]}" "${COMP_WORDS[COMP_CWORD-1]}"
@@ -22,6 +23,7 @@ _khal_complete()
 	# Completing an alias; delegate to its custom completion function (if
 	# available)
 	if type -t "$khalAlias" >/dev/null; then
+	    local KHAL_COMMAND="${COMP_WORDS[0]}"   # Allow access to the original command, as COMP_WORDS[0] gets overwritten.
 	    COMP_WORDS=("khal-${COMP_WORDS[1]}" "${COMP_WORDS[@]:2}")
 	    let COMP_CWORD-=1
 	    "$khalAlias" "${COMP_WORDS[0]}" "${COMP_WORDS[COMP_CWORD]}" "${COMP_WORDS[COMP_CWORD-1]}"
