@@ -35,5 +35,12 @@ _khal_complete()
 	# function as khal aliasname).
 	readarray -O ${#COMPREPLY[@]} -t COMPREPLY < <(compgen -W "${builtinCommands[*]}"$'\n'"${aliases[*]}" -X "!${2}*")
     fi
+    if [ $COMP_CWORD -eq 2 ]; then
+	# Also offer sub-aliases (khal-aliasname-subaliasname, callable via my
+	# khal wrapper function as khal aliasname subaliasname).
+	typeset -a subAliases=(); readarray -t subAliases < <(compgen -A command -- "khal-${COMP_WORDS[1]}-" 2>/dev/null)
+	subAliases=("${subAliases[@]/#khal-${COMP_WORDS[1]}-/}")
+	readarray -O ${#COMPREPLY[@]} -t COMPREPLY < <(compgen -W "${subAliases[*]}" -X "!${2}*")
+    fi
 }
 complete -F _khal_complete khal
