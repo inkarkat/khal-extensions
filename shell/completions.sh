@@ -33,7 +33,7 @@ _khal_complete()
 	typeset -a builtinCommands=(at calendar edit import interactive list new printcalendars printformats printics search)
 	# Also offer aliases (khal-aliasname, callable via my khal wrapper
 	# function as khal aliasname).
-	readarray -O ${#COMPREPLY[@]} -t COMPREPLY < <(compgen -W "${builtinCommands[*]}${aliases[*]}" -X "!${2}*")
+	readarray -O ${#COMPREPLY[@]} -t COMPREPLY < <(compgen -W "${builtinCommands[*]}"$'\n'"${aliases[*]}" -X "!${2}*")
     fi
 }
 complete -F _khal_complete khal
