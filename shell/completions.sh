@@ -6,14 +6,25 @@ _khal_complete()
     typeset -a aliases=(); readarray -t aliases < <(compgen -A command -- 'khal-' 2>/dev/null)
     aliases=("${aliases[@]/#khal-/}")
 
-    if [ $COMP_CWORD -ge 2 ] && contains "${COMP_WORDS[1]% }" "${aliases[@]}"; then
+    if [ $COMP_CWORD -ge 3 ] && contains "${COMP_WORDS[1]}-${COMP_WORDS[2]}" "${aliases[@]}"; then
+	local khalAlias="_khal_${COMP_WORDS[1]//-/_}_${COMP_WORDS[2]//-/_}"
+	# Completing a sub-alias; delegate to its custom completion function (if
+	# available)
+	if type -t "$khalAlias" >/dev/null; then
+	    COMP_WORDS=("khal-${COMP_WORDS[1]}-${COMP_WORDS[2]}" "${COMP_WORDS[@]:3}")
+	    let COMP_CWORD-=2
+	    "$khalAlias" "${COMP_WORDS[0]}" "${COMP_WORDS[COMP_CWORD]}" "${COMP_WORDS[COMP_CWORD-1]}"
+	    return $?
+	fi
+    fi
+    if [ $COMP_CWORD -ge 2 ] && contains "${COMP_WORDS[1]}" "${aliases[@]}"; then
 	local khalAlias="_khal_${COMP_WORDS[1]//-/_}"
 	# Completing an alias; delegate to its custom completion function (if
 	# available)
-	if type -t "${khalAlias% }" >/dev/null; then
-	    COMP_WORDS=("khal-${COMP_WORDS[1]% }" "${COMP_WORDS[@]:2}")
+	if type -t "$khalAlias" >/dev/null; then
+	    COMP_WORDS=("khal-${COMP_WORDS[1]}" "${COMP_WORDS[@]:2}")
 	    let COMP_CWORD-=1
-	    "${khalAlias% }" "${COMP_WORDS[0]}" "${COMP_WORDS[COMP_CWORD]}" "${COMP_WORDS[COMP_CWORD-1]}"
+	    "$khalAlias" "${COMP_WORDS[0]}" "${COMP_WORDS[COMP_CWORD]}" "${COMP_WORDS[COMP_CWORD-1]}"
 	    return $?
 	fi
     elif [ $COMP_CWORD -eq 1 ]; then
