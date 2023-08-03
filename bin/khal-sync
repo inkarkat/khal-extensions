@@ -13,4 +13,4 @@ case "$1" in
 esac
 
 systemctl --user start vdirsyncer.service \
-    && systemctl-wait-for-run --user vdirsyncer.service
+    && systemctl-wait-for-run --spinner 'calendar sync' --user vdirsyncer.service
