@@ -90,12 +90,12 @@ summarizeProcessing()
     local quadrantSum=$((${quadrants[@]/%/+}0))
 
     printf -- '--\n%s → [¹%s|²%s|³%s|⁴%s] ⁻%s\n' \
-	"$(secondsToDuration -- "$summarySeconds")" \
-	"$(secondsToDuration -- "${quadrants[1]}")$(getPercentage ${quadrants[1]} $quadrantSum)" \
-	"$(secondsToDuration -- "${quadrants[2]}")$(getPercentage ${quadrants[2]} $quadrantSum)" \
-	"$(secondsToDuration -- "${quadrants[3]}")$(getPercentage ${quadrants[3]} $quadrantSum)" \
-	"$(secondsToDuration -- "${quadrants[4]}")$(getPercentage ${quadrants[4]} $quadrantSum)" \
-	"$(secondsToDuration -- "${quadrants[0]}")$(getPercentage ${quadrants[0]} $quadrantSum)"
+	"$(secondsToDuration $KHAL_TIMESPAN_OVERALL_PRECISION -- "$summarySeconds")" \
+	"$(secondsToDuration $KHAL_TIMESPAN_QUADRANT_PRECISION -- "${quadrants[1]}")$(getPercentage ${quadrants[1]} $quadrantSum)" \
+	"$(secondsToDuration $KHAL_TIMESPAN_QUADRANT_PRECISION -- "${quadrants[2]}")$(getPercentage ${quadrants[2]} $quadrantSum)" \
+	"$(secondsToDuration $KHAL_TIMESPAN_QUADRANT_PRECISION -- "${quadrants[3]}")$(getPercentage ${quadrants[3]} $quadrantSum)" \
+	"$(secondsToDuration $KHAL_TIMESPAN_QUADRANT_PRECISION -- "${quadrants[4]}")$(getPercentage ${quadrants[4]} $quadrantSum)" \
+	"$(secondsToDuration $KHAL_TIMESPAN_QUADRANT_PRECISION -- "${quadrants[0]}")$(getPercentage ${quadrants[0]} $quadrantSum)"
 }
 
 
