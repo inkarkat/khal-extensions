@@ -126,8 +126,7 @@ summarizeProcessing()
 
 
 summarizeSetup
-
-khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "$(date --date "${KHAL_GREP_DATERANGE:?}" +%F)" today \
+khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?}" +%F)}" "${KHAL_RANGE_END:-today}" \
     | grep "${grepArgs[@]}" "$@" \
     | reldate --relative-to-first --difference \
     | startEndPipeline \
