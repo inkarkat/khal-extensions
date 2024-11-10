@@ -7,14 +7,32 @@ shopt -qs extglob
 : ${ENGINEERINGWEEK_SECONDS:=$((ENGINEERINGDAY_SECONDS * 5))}
 : ${ENGINEERING_PREFIX:=e}
 
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: [KHAL_GREP_DATERANGE=START_DATE] %q %s\n' "$(basename "$1")" '[KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
+}
 printUsage()
 {
-    cat <<HELPTEXT
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
 Show all events in the past ${KHAL_GREP_DATERANGE} that match PATTERN, followed
 by a summary of the total duration and date range in which they were scheduled.
-HELPTEXT
+HELPDESCRIPTION
     echo
-    printf 'Usage: [KHAL_GREP_DATERANGE=START_DATE] %q %s\n' "$(basename "$1")" '[KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+HELPTEXT
 }
 typeset -a grepArgs=()
 typeset -a khalMainArgs=()
@@ -22,7 +40,7 @@ typeset -a khalListArgs=()
 while [ $# -ne 0 ]
 do
     case "$1" in
-	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 
 	# Use color for grep, not khal, as that would likely interfere with the
 	# grepping.
