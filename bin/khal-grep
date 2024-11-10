@@ -2,27 +2,50 @@
 set -o pipefail
 shopt -qs extglob
 
+: ${KHAL_GREP_COMMAND_JOINER=|}
 : ${KHAL_GREP_DATERANGE:=3 months ago}
 : ${ENGINEERINGDAY_SECONDS:=$((6 * 3600))}
 : ${ENGINEERINGWEEK_SECONDS:=$((ENGINEERINGDAY_SECONDS * 5))}
 : ${ENGINEERING_PREFIX:=e}
 
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: [KHAL_GREP_DATERANGE=START_DATE] %q %s\n' "$(basename "$1")" '[--process PROCESSING-COMMAND [--process ...]] [KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
+}
 printUsage()
 {
-    cat <<HELPTEXT
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
 Show all events in the past ${KHAL_GREP_DATERANGE} that match PATTERN, followed
 by a summary of the total duration and date range in which they were scheduled.
-HELPTEXT
+HELPDESCRIPTION
     echo
-    printf 'Usage: [KHAL_GREP_DATERANGE=START_DATE] %q %s\n' "$(basename "$1")" '[KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --process PROCESSING-COMMAND
+			Transform the result via PROCESSING-COMMAND.
+HELPTEXT
 }
+
 typeset -a grepArgs=()
 typeset -a khalMainArgs=()
 typeset -a khalListArgs=()
+unset processingCommands
 while [ $# -ne 0 ]
 do
     case "$1" in
-	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 
 	# Use color for grep, not khal, as that would likely interfere with the
 	# grepping.
@@ -35,6 +58,7 @@ do
 	-[ad])		khalListArgs+=("$1" "${2?}"); shift; shift;;
 	--@(include-calendar|exclude-calendar))
 			khalListArgs+=("$1" "${2?}"); shift; shift;;
+	--process)	shift; processingCommands+="${processingCommands:+ $KHAL_GREP_COMMAND_JOINER }$1"; shift;;
 	--)		grepArgs+=("$1"); shift; break;;
 	*)		grepArgs+=("$1"); shift;;
     esac
@@ -43,6 +67,7 @@ if [ ${#grepArgs[@]} -eq 0 -a $# -eq 0 ]; then
     printUsage "$0" >&2
     exit 2
 fi
+: ${processingCommands="fieldMap 3 '|secondsToDuration --unbuffered --width 6'"}
 
 getFifo()
 {
@@ -101,12 +126,11 @@ summarizeProcessing()
 
 
 summarizeSetup
-
-khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "$(date --date "${KHAL_GREP_DATERANGE:?}" +%F)" today \
+khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?}" +%F)}" "${KHAL_RANGE_END:-today}" \
     | grep "${grepArgs[@]}" "$@" \
     | reldate --relative-to-first --difference \
     | startEndPipeline \
-    | summarizePipeline \
-    | fieldMap 3 '|secondsToDuration --unbuffered --width 6'
+    | eval 'summarizePipeline' \
+    "${processingCommands:+|}$processingCommands"
 
 summarizeProcessing

@@ -10,8 +10,10 @@ HELPTEXT
     echo
     printf 'Usage: %q %s\n' "$(basename "$1")" '[KHAL-LIST-ARGS ...] START END|DELTA|eod|week [-?|-h|--help]'
 }
+typeset -a colorArg=()
 case "$1" in
     --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+    --no-color|--color)	colorArg=("$1"); shift;;
 esac
 if [ $# -lt 2 ]; then
     echo 'ERROR: No START END|DELTA|eod|week passed.'
@@ -21,6 +23,13 @@ if [ $# -lt 2 ]; then
 fi >&2
 end="${!#}"
 start="${*:(-2):1}"
+
+khalAlias="khal-$1"
+if type -t "$khalAlias" >/dev/null; then
+    shift
+    export KHAL_RANGE_START="$start" KHAL_RANGE_END="$end"
+    exec "$khalAlias" "${colorArg[@]}" "${@:1:$(($#-2))}"
+fi
 set -- "${@:1:$(($#-2))}"
 
 getFifo()
@@ -101,7 +110,7 @@ summarizeProcessing()
 
 summarizeSetup
 
-khal-wrapper list "$@" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "$start" "$end" \
+khal-wrapper list "${colorArg[@]}" "$@" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "$start" "$end" \
     | reldate --relative-to-first --difference \
     | quadrantPipeline \
     | summarizePipeline \
