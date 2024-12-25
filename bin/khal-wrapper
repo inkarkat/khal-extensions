@@ -55,6 +55,7 @@ typeset -A pagerDisabledCommands=(
     [edit]=''
     [fib-tally]=''
     [interactive]=''
+    [new]='-i|--interactive'
 )
 
 pagerDisableCheck()
