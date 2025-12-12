@@ -12,7 +12,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: [KHAL_GREP_DATERANGE=START_DATE] %q %s\n' "$(basename "$1")" '[--process PROCESSING-COMMAND [--process ...]] [KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
+    printf 'Usage: [KHAL_GREP_DATERANGE=START_DATE] %q %s\n' "$(basename "$1")" '[-Y|--summary-only] [--process PROCESSING-COMMAND [--process ...]] [KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
 }
 printUsage()
 {
@@ -33,6 +33,8 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
+    --summary-only|-Y	Do not output the individual events; just show the total
+			effort and date range.
     --process PROCESSING-COMMAND
 			Transform the result via PROCESSING-COMMAND.
 HELPTEXT
@@ -41,6 +43,7 @@ HELPTEXT
 typeset -a grepArgs=()
 typeset -a khalMainArgs=()
 typeset -a khalListArgs=()
+isShowEvents=t
 unset processingCommands
 while [ $# -ne 0 ]
 do
@@ -58,6 +61,8 @@ do
 	-[ad])		khalListArgs+=("$1" "${2?}"); shift; shift;;
 	--@(include-calendar|exclude-calendar))
 			khalListArgs+=("$1" "${2?}"); shift; shift;;
+	--summary-only|-Y)
+			shift; isShowEvents=;;
 	--process)	shift; processingCommands+="${processingCommands:+ $KHAL_GREP_COMMAND_JOINER }$1"; shift;;
 	--)		grepArgs+=("$1"); shift; break;;
 	*)		grepArgs+=("$1"); shift;;
@@ -96,9 +101,18 @@ startEndPipeline()
 {
     tee >(headtail -n 1 --duplicate-if-short | field 1 | outputOrPrintf \\n\\n >&4)
 }
+
+summarizer()
+{
+    sumField 3 | outputOrPrintf \\n >&3
+}
 summarizePipeline()
 {
-    tee >(sumField 3 | outputOrPrintf \\n >&3)
+    if [ "$isShowEvents" ]; then
+	tee >(summarizer)
+    else
+	summarizer
+    fi
 }
 summarizeProcessing()
 {
@@ -117,7 +131,7 @@ summarizeProcessing()
 	range="from $start until $end"
     fi
 
-    printf -- '--\nTotal effort: %s (%s) over %s (%s)\n' \
+    printf -- "${isShowEvents:+--\\n}Total effort: %s (%s) over %s (%s)\\n" \
 	"$(WORKDAY_SECONDS=$ENGINEERINGDAY_SECONDS WORKWEEK_SECONDS=$ENGINEERINGWEEK_SECONDS WORK_PREFIX="$ENGINEERING_PREFIX" secondsToDuration --workday --precision Ud -- "$summarySeconds")" \
 	"$(secondsToDuration --precision Uh -- "$summarySeconds")" \
 	"$dateDiff" \
