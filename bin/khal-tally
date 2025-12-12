@@ -57,8 +57,8 @@ export KHAL_GREP_DATERANGE=1970-01-01
 khal-grep --color=never "${khalGrepArgs[@]}" \
     --process 'field 1 2 3 4 5 6' \
     --process 'sumField --group-by -1 --result-first -2' \
-    -e "\\b${what} [[:digit:]]\\+ [[:alpha:]]\\+${context}\$" \
+    -e "\\b\\(${what}\\) [[:digit:]]\\+ [[:alpha:]]\\+${context}\$" \
     "$@" \
     || khal-grep --color=never --summary-only "${khalGrepArgs[@]}" \
-	-e "\\b${what}${context}\$" \
+	-e "\\b\\(${what}\\)${context}\$" \
 	"$@"
