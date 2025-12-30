@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '"WHAT [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '"WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -18,7 +18,8 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Show all events whose title matches WHAT [NUMBER UNIT] [CONTEXT ...].
+Show all events whose title matches WHAT-PATTERN [NUMBER UNIT] [CONTEXT ...].
+WHAT-PATTERN is a grep-style anchored basic regular expresion.
 If there are NUMBER(s), extract all for each UNIT and show their sums.
 Print a summary of the total duration and date range in which they were
 scheduled.
