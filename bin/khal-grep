@@ -70,6 +70,9 @@ do
 	--no-summary|-Y)
 			shift; isSummarize=;;
 	--process)	shift; processingCommands+="${processingCommands:+ $KHAL_GREP_COMMAND_JOINER }$1"; shift;;
+
+	--regexp|-e)	grepArgs+=("$1" "${2//^/$'\a\f'}"); shift; shift;;
+	--regexp=*)	grepArgs+=("${1//^/$'\a\f'}"); shift;;
 	--)		grepArgs+=("$1"); shift; break;;
 	*)		grepArgs+=("$1"); shift;;
     esac
@@ -78,7 +81,7 @@ if [ ${#grepArgs[@]} -eq 0 -a $# -eq 0 ]; then
     printUsage "$0" >&2
     exit 2
 fi
-: ${processingCommands="fieldMap 3 '|secondsToDuration --unbuffered --width 6'"}
+: ${processingCommands="fieldMap -F '\t' 2 '|secondsToDuration --unbuffered --width 6'"}
 
 getFifo()
 {
@@ -147,11 +150,15 @@ summarizeProcessing()
 
 [ ! "$isSummarize" ] || summarizeSetup
 
-khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format $'{start-date-long} {start-time} {end-date-long} {end-time} {title}' "${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?}" +%F)}" "${KHAL_RANGE_END:-$ABSOLUTE_END}" \
+# Use \a\f (bell + form feed) as the marker for the title, so that we have
+# something unique to match for the ^ anchor. Remove after matching.
+khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format $'{start-date-long} {start-time}\t{end-date-long} {end-time} \t\a\f{title}' "${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?}" +%F)}" "${KHAL_RANGE_END:-$ABSOLUTE_END}" \
     | grep "${grepArgs[@]}" "$@" \
+    | sed 's/\a\f//' \
     | eval 'reldate --relative-to-first --difference' \
     "${isSummarize:+| startEndPipeline}" \
     "${isSummarize:+| summarizePipeline}" \
-    "${processingCommands:+|}$processingCommands"
+    "${processingCommands:+|}$processingCommands" \
+    | column -s $'\t' -t
 
 [ ! "$isSummarize" ] || summarizeProcessing

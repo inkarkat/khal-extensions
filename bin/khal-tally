@@ -57,7 +57,7 @@ fi; shift
 getMatchExpr()
 {
     local numberUnitMulti="${1?}"; shift
-    printf %s "\\b\\(${what}\\)\\( [[:digit:]]\\+ [[:alpha:]]\\+\\)${numberUnitMulti}${context}\$"
+    printf %s "^\\(${what}\\)\\( [[:digit:]]\\+ [[:alpha:]]\\+\\)${numberUnitMulti}${context}\$"
 }
 
 export KHAL_GREP_DATERANGE=1970-01-01
