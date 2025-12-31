@@ -7,6 +7,7 @@ shopt -qs extglob
 : ${ENGINEERINGDAY_SECONDS:=$((6 * 3600))}
 : ${ENGINEERINGWEEK_SECONDS:=$((ENGINEERINGDAY_SECONDS * 5))}
 : ${ENGINEERING_PREFIX:=e}
+readonly ABSOLUTE_END=2099-12-31    # XXX: khal 0.13.0 scales linearly, and dates beyond the year 2999 cannot be parsed
 
 printShortUsage()
 {
@@ -146,7 +147,7 @@ summarizeProcessing()
 
 [ ! "$isSummarize" ] || summarizeSetup
 
-khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?}" +%F)}" "${KHAL_RANGE_END:-today}" \
+khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format $'{start-date-long} {start-time} {end-date-long} {end-time} {title}' "${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?}" +%F)}" "${KHAL_RANGE_END:-$ABSOLUTE_END}" \
     | grep "${grepArgs[@]}" "$@" \
     | eval 'reldate --relative-to-first --difference' \
     "${isSummarize:+| startEndPipeline}" \
