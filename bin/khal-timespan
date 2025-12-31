@@ -1,18 +1,41 @@
 #!/bin/bash
 set -o pipefail
 
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-y|--summary-only|-Y|--no-summary] [KHAL-LIST-ARGS ...] START END|DELTA|eod|week [-?|-h|--help]'
+}
 printUsage()
 {
-    cat <<HELPTEXT
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
 Show all events from the passed range of dates from START to END (or DELTA),
 followed by the total duration.
-HELPTEXT
+HELPDESCRIPTION
     echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[KHAL-LIST-ARGS ...] START END|DELTA|eod|week [-?|-h|--help]'
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --summary-only|-y	Do not output the individual events; just show the total
+			effort and date range.
+    --no-summary|-Y	Just output the individual events without total effort
+			and date range at the end.
+HELPTEXT
 }
+
 typeset -a colorArg=()
 case "$1" in
-    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+    --help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
     --no-color|--color)	colorArg=("$1"); shift;;
 esac
 if [ $# -lt 2 ]; then
@@ -23,14 +46,32 @@ if [ $# -lt 2 ]; then
 fi >&2
 end="${!#}"
 start="${*:(-2):1}"
+set -- "${@:1:$(($#-2))}"
 
 khalAlias="khal-$1"
 if type -t "$khalAlias" >/dev/null; then
     shift
     export KHAL_RANGE_START="$start" KHAL_RANGE_END="$end"
-    exec "$khalAlias" "${colorArg[@]}" "${@:1:$(($#-2))}"
+    exec "$khalAlias" "${colorArg[@]}" "$@"
 fi
-set -- "${@:1:$(($#-2))}"
+
+isShowEvents=t
+isSummarize=t
+typeset -a khalArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--summary-only|-y)
+			shift; isShowEvents=;;
+	--no-summary|-Y)
+			shift; isSummarize=;;
+	--)		khalArgs+=("$1"); shift; break;;
+	*)		khalArgs+=("$1"); shift;;
+    esac
+done
+set -- "${khalArgs[@]}" "$@"
+
 
 getFifo()
 {
@@ -73,9 +114,17 @@ quadrantPipeline()
 	} >&4
     )
 }
+summarizer()
+{
+    { sumField 3 || echo 0; } >&3
+}
 summarizePipeline()
 {
-    tee >({ sumField 3 || echo 0; } >&3)
+    if [ "$isShowEvents" ]; then
+	tee >(summarizer)
+    else
+	summarizer
+    fi
 }
 getPercentage()
 {
@@ -98,7 +147,7 @@ summarizeProcessing()
 
     local quadrantSum=$((${quadrants[@]/%/+}0))
 
-    printf -- '--\n%s → [¹%s|²%s|³%s|⁴%s] ⁻%s\n' \
+    printf -- "${isShowEvents:+--\\n}%s → [¹%s|²%s|³%s|⁴%s] ⁻%s\\n" \
 	"$(secondsToDuration $KHAL_TIMESPAN_OVERALL_PRECISION -- "$summarySeconds")" \
 	"$(secondsToDuration $KHAL_TIMESPAN_QUADRANT_PRECISION -- "${quadrants[1]}")$(getPercentage ${quadrants[1]} $quadrantSum)" \
 	"$(secondsToDuration $KHAL_TIMESPAN_QUADRANT_PRECISION -- "${quadrants[2]}")$(getPercentage ${quadrants[2]} $quadrantSum)" \
@@ -108,12 +157,12 @@ summarizeProcessing()
 }
 
 
-summarizeSetup
+[ ! "$isSummarize" ] || summarizeSetup
 
 khal-wrapper list "${colorArg[@]}" "$@" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "$start" "$end" \
-    | reldate --relative-to-first --difference \
-    | quadrantPipeline \
-    | summarizePipeline \
+    | eval 'reldate --relative-to-first --difference' \
+    "${isSummarize:+| quadrantPipeline}" \
+    "${isSummarize:+| summarizePipeline}" \
     | fieldMap 3 '|secondsToDuration --unbuffered --width 6'
 
-summarizeProcessing
+[ ! "$isSummarize" ] || summarizeProcessing
