@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-y|--summary-only|-Y|--no-summary] [KHAL-LIST-ARGS ...] START END|DELTA|eod|week [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-y|--summary-only|-Y|--no-summary] [KHAL-COMMAND|KHAL-LIST-ARGS ...] START END|DELTA|eod|week [-?|-h|--help]'
 }
 printUsage()
 {
@@ -19,8 +19,8 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Show all events from the passed range of dates from START to END (or DELTA),
-followed by the total duration.
+Show all events (followed by the total duration) from / run KHAL-COMMAND with
+the passed range of dates from START to END (or DELTA).
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
