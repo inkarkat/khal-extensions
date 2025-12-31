@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '"WHAT [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '"WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -18,7 +18,8 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Show all events whose title matches WHAT [NUMBER UNIT] [CONTEXT ...].
+Show all events whose title matches WHAT-PATTERN [NUMBER UNIT] [CONTEXT ...].
+WHAT-PATTERN is a grep-style anchored basic regular expresion.
 If there are NUMBER(s), extract all for each UNIT and show their sums.
 Print a summary of the total duration and date range in which they were
 scheduled.
@@ -32,7 +33,7 @@ HELPDESCRIPTION
 HELPTEXT
 }
 
-typeset -a khalGrepArgs=()
+isSummaryOnly=
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -40,7 +41,7 @@ do
 	--no-color|--color)
 			shift;;	# Ignore color flag; tally doesn't use highlighting.
 	--summary-only|-Y)
-			khalGrepArgs+=("$1"); shift;;
+			isSummaryOnly=t; shift;;
 	--)		shift; break;;
 	*)		break;;
     esac
@@ -53,12 +54,19 @@ else
     context='\([[:space:]].*\)\?'
 fi; shift
 
+getMatchExpr()
+{
+    local numberUnitMulti="${1?}"; shift
+    printf %s "\\b\\(${what}\\)\\( [[:digit:]]\\+ [[:alpha:]]\\+\\)${numberUnitMulti}${context}\$"
+}
+
 export KHAL_GREP_DATERANGE=1970-01-01
-khal-grep --color=never "${khalGrepArgs[@]}" \
-    --process 'field 1 2 3 4 5 6' \
-    --process 'sumField --group-by -1 --result-first -2' \
-    -e "\\b\\(${what}\\) [[:digit:]]\\+ [[:alpha:]]\\+${context}\$" \
-    "$@" \
-    || khal-grep --color=never --summary-only "${khalGrepArgs[@]}" \
-	-e "\\b\\(${what}\\)${context}\$" \
+[ "$isSummaryOnly" ] || \
+    khal-grep --color=never --no-summary \
+	--process 'field 1 2 3 4 5 6' \
+	--process 'sumField --group-by -1 --result-first -2' \
+	-e "$(getMatchExpr '')" \
 	"$@"
+khal-grep --color=never --summary-only \
+    -e "$(getMatchExpr '\?')" \
+    "$@"

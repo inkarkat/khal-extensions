@@ -12,7 +12,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: [KHAL_GREP_DATERANGE=START_DATE] %q %s\n' "$(basename "$1")" '[-Y|--summary-only] [--process PROCESSING-COMMAND [--process ...]] [KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
+    printf 'Usage: [KHAL_GREP_DATERANGE=START_DATE] %q %s\n' "$(basename "$1")" '[-Y|--summary-only|--no-summary] [--process PROCESSING-COMMAND [--process ...]] [KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
 }
 printUsage()
 {
@@ -35,6 +35,8 @@ HELPDESCRIPTION
     cat <<HELPTEXT
     --summary-only|-Y	Do not output the individual events; just show the total
 			effort and date range.
+    --no-summary	Just output the individual events without total effort
+			and date range at the end.
     --process PROCESSING-COMMAND
 			Transform the result via PROCESSING-COMMAND.
 HELPTEXT
@@ -44,6 +46,7 @@ typeset -a grepArgs=()
 typeset -a khalMainArgs=()
 typeset -a khalListArgs=()
 isShowEvents=t
+isSummarize=t
 unset processingCommands
 while [ $# -ne 0 ]
 do
@@ -63,6 +66,7 @@ do
 			khalListArgs+=("$1" "${2?}"); shift; shift;;
 	--summary-only|-Y)
 			shift; isShowEvents=;;
+	--no-summary)	shift; isSummarize=;;
 	--process)	shift; processingCommands+="${processingCommands:+ $KHAL_GREP_COMMAND_JOINER }$1"; shift;;
 	--)		grepArgs+=("$1"); shift; break;;
 	*)		grepArgs+=("$1"); shift;;
@@ -139,12 +143,13 @@ summarizeProcessing()
 }
 
 
-summarizeSetup
+[ ! "$isSummarize" ] || summarizeSetup
+
 khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?}" +%F)}" "${KHAL_RANGE_END:-today}" \
     | grep "${grepArgs[@]}" "$@" \
-    | reldate --relative-to-first --difference \
-    | startEndPipeline \
-    | eval 'summarizePipeline' \
+    | eval 'reldate --relative-to-first --difference' \
+    "${isSummarize:+| startEndPipeline}" \
+    "${isSummarize:+| summarizePipeline}" \
     "${processingCommands:+|}$processingCommands"
 
-summarizeProcessing
+[ ! "$isSummarize" ] || summarizeProcessing
