@@ -53,6 +53,7 @@ fromCount=1
 toPattern=
 isToLatest=
 toCount=1
+isInverted=
 typeset -a args=()
 typeset -a khalArgs=()
 while [ $# -ne 0 ]
@@ -68,6 +69,7 @@ do
 	--to-earliest)	shift; toPattern="${1:?}"; shift; isToLatest=;;
 	--to-latest)	shift; toPattern="${1:?}"; shift; isToLatest=t;;
 	--to-count)	shift; toCount="${1:?}"; shift;;
+	--inverted)	shift; isInverted=t;;
 
 	-[ad])		khalArgs+=("$1" "${2?}"); shift; shift;;
 	--)		args+=("$1"); shift; break;;
@@ -97,6 +99,21 @@ findDate()
 	| outputOrErrorPrintf 'ERROR: No %smatch for %s\n' "$(test $count -eq 1 || number2ordinal --long $count | suffix ' ')" "$pattern"
 }
 
+doRange()
+{
+    local start="${1:?}"; shift
+    local end="${1:?}"; shift
+
+    local khalAlias="khal-$1"
+    if type -t "$khalAlias" >/dev/null; then
+	shift
+	export KHAL_RANGE_START="$start" KHAL_RANGE_END="$end"
+	"$khalAlias" "${colorArg[@]}" "${khalArgs[@]}" "$@"
+    else
+	khal-timespan "${colorArg[@]}" "${khalArgs[@]}" "$@" "$start" "$end"
+    fi
+}
+
 readonly ABSOLUTE_START=1970-01-01
 readonly ABSOLUTE_END=2099-12-31    # XXX: khal 0.13.0 scales linearly, and dates beyond the year 2999 cannot be parsed
 readonly SEARCH_START="${KHAL_RANGE_START:-$ABSOLUTE_START}"
@@ -106,11 +123,24 @@ start="$SEARCH_START"
 end="$SEARCH_END"
 [ -z "$toPattern" ] || end="$(findDate end "$toPattern" "$isToLatest" "$toCount")" || exit $?
 
-khalAlias="khal-$1"
-if type -t "$khalAlias" >/dev/null; then
-    shift
-    export KHAL_RANGE_START="$start" KHAL_RANGE_END="$end"
-    exec "$khalAlias" "${colorArg[@]}" "${khalArgs[@]}" "$@"
+if [ "$isInverted" ]; then
+    # Subtract one minute from the start time so that that event isn't included in
+    # the first (preceding) inverted range. For the end date, no such arithmetics is
+    # necessary.
+    type -t -- dateex >/dev/null && start="$(dateex --date "$start -1m" '+%F %R')"
+####D echo >&2 "**** $SEARCH_START / $start / $end / $SEARCH_END"
+
+    doRange "$SEARCH_START" "$start" "$@" | outputOrError --multiline --status 99; status=$?
+
+    typeset -a paddingCommand=(outputAndPrintf '\n')
+    if [ $status -eq 99 ]; then
+	status=0
+	paddingCommand=()
+    fi
+
+    eval 'doRange "$end" "$SEARCH_END" "$@"' \
+	"${paddingCommand:+|}" '"${paddingCommand[@]}"' \
+	|| exit $status
 else
-    exec khal-timespan "${colorArg[@]}" "${khalArgs[@]}" "$@" "$start" "$end"
+    doRange "$start" "$end" "$@"
 fi
