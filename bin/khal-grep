@@ -12,7 +12,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: [KHAL_GREP_DATERANGE=START_DATE] %q %s\n' "$(basename "$1")" '[-Y|--summary-only|--no-summary] [--process PROCESSING-COMMAND [--process ...]] [KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
+    printf 'Usage: [KHAL_GREP_DATERANGE=START_DATE] %q %s\n' "$(basename "$1")" '[-y|--summary-only|-Y|--no-summary] [--process PROCESSING-COMMAND [--process ...]] [KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
 }
 printUsage()
 {
@@ -33,9 +33,9 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
-    --summary-only|-Y	Do not output the individual events; just show the total
+    --summary-only|-y	Do not output the individual events; just show the total
 			effort and date range.
-    --no-summary	Just output the individual events without total effort
+    --no-summary|-Y	Just output the individual events without total effort
 			and date range at the end.
     --process PROCESSING-COMMAND
 			Transform the result via PROCESSING-COMMAND.
@@ -64,9 +64,10 @@ do
 	-[ad])		khalListArgs+=("$1" "${2?}"); shift; shift;;
 	--@(include-calendar|exclude-calendar))
 			khalListArgs+=("$1" "${2?}"); shift; shift;;
-	--summary-only|-Y)
+	--summary-only|-y)
 			shift; isShowEvents=;;
-	--no-summary)	shift; isSummarize=;;
+	--no-summary|-Y)
+			shift; isSummarize=;;
 	--process)	shift; processingCommands+="${processingCommands:+ $KHAL_GREP_COMMAND_JOINER }$1"; shift;;
 	--)		grepArgs+=("$1"); shift; break;;
 	*)		grepArgs+=("$1"); shift;;
