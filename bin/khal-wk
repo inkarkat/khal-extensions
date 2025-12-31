@@ -7,7 +7,7 @@ printUsage()
 Show all events from this week, followed by the total duration.
 HELPTEXT
     echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[KHAL-LIST-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-y|--summary-only|-Y|--no-summary] [KHAL-LIST-ARGS ...] [-?|-h|--help]'
 }
 case "$1" in
     --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
