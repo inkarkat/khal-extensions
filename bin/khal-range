@@ -1,0 +1,115 @@
+#!/bin/bash
+set -o pipefail
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, they can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--from-earliest PATTERN|--from-latest PATTERN [--from-count N]] [--to-earliest PATTERN|--to-latest PATTERN [--to-count N]] [--inverted] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Show all events / run KHAL-COMMAND with the passed range of dates determined by
+the events that match PATTERN.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --from-earliest PATTERN
+			The earliest occurrence of PATTERN sets the start of the
+			range.
+    --from-latest PATTERN
+			The latest occurrence of PATTERN sets the start of the
+			range.
+    --from-count N	Use the N'th occurrence of PATTERN instead of the first.
+    --to-earliest PATTERN
+			The earliest occurrence of PATTERN sets the end of the
+			range.
+    --to-latest PATTERN
+			The latest occurrence of PATTERN sets the end of the
+			range.
+    --to-count N	Use the N'th occurrence of PATTERN instead of the first.
+    --inverted		Show events outside the passed range of dates / run
+			KHAL-COMMAND twice, with a range up to the from date and
+			then starting at the to date into the indefinite future.
+HELPTEXT
+}
+
+typeset -a colorArg=()
+fromPattern=
+isFromLatest=
+fromCount=1
+toPattern=
+isToLatest=
+toCount=1
+typeset -a args=()
+typeset -a khalArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--no-color|--color)
+			colorArg=("$1"); shift;;
+	--from-earliest)
+			shift; fromPattern="${1:?}"; shift; isFromLatest=;;
+	--from-latest)	shift; fromPattern="${1:?}"; shift; isFromLatest=t;;
+	--from-count)	shift; fromCount="${1:?}"; shift;;
+	--to-earliest)	shift; toPattern="${1:?}"; shift; isToLatest=;;
+	--to-latest)	shift; toPattern="${1:?}"; shift; isToLatest=t;;
+	--to-count)	shift; toCount="${1:?}"; shift;;
+
+	-[ad])		khalArgs+=("$1" "${2?}"); shift; shift;;
+	--)		args+=("$1"); shift; break;;
+	*)		args+=("$1"); shift;;
+    esac
+done
+set -- "${args[@]}" "$@"
+
+if [ -z "$fromPattern" -a -z "$toPattern" ]; then
+    echo 'ERROR: Need at least one --from-* or --to-* PATTERN.'
+    echo
+    printUsage "$0"
+    exit 2
+fi >&2
+
+findDate()
+{
+    local what="${1:?}"; shift
+    local pattern="${1:?}"; shift
+    local isLatestFirst="${1?}"; shift
+    local count="${1:?}"; shift
+
+    khal-wrapper list "${khalArgs[@]}" --day-format '' --format "{${what}-date-long} {${what}-time}"$'\t\a\f'"{title}" "$ABSOLUTE_START" "$ABSOLUTE_END" \
+	| eval "grep -e \"\${pattern//^/\$'\t\a\f'}\"" \
+	"${isLatestFirst:+| tac}" \
+	| sed -n "${count}s/\t\a\f.*\$//p" \
+	| outputOrErrorPrintf 'ERROR: No %smatch for %s\n' "$(test $count -eq 1 || number2ordinal --long $count | suffix ' ')" "$pattern"
+}
+
+readonly ABSOLUTE_START=1970-01-01
+readonly ABSOLUTE_END=2099-12-31    # XXX: khal 0.13.0 scales linearly, and dates beyond the year 2999 cannot be parsed
+
+start="$ABSOLUTE_START"
+[ -z "$fromPattern" ] || start="$(findDate start "$fromPattern" "$isFromLatest" "$fromCount")" || exit $?
+end="$ABSOLUTE_END"
+[ -z "$toPattern" ] || end="$(findDate end "$toPattern" "$isToLatest" "$toCount")" || exit $?
+
+khalAlias="khal-$1"
+if type -t "$khalAlias" >/dev/null; then
+    shift
+    export KHAL_RANGE_START="$start" KHAL_RANGE_END="$end"
+    exec "$khalAlias" "${colorArg[@]}" "${khalArgs[@]}" "$@"
+else
+    exec khal-timespan "${colorArg[@]}" "${khalArgs[@]}" "$@" "$start" "$end"
+fi
