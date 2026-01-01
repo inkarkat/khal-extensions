@@ -43,6 +43,9 @@ HELPDESCRIPTION
 HELPTEXT
 }
 
+typeset -a formatter=(column -s $'\t' -t)
+[ -t 1 ] || formatter=()
+
 typeset -a grepArgs=()
 typeset -a khalMainArgs=()
 typeset -a khalListArgs=()
@@ -159,6 +162,6 @@ khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-for
     "${isSummarize:+| startEndPipeline}" \
     "${isSummarize:+| summarizePipeline}" \
     "${processingCommands:+|}$processingCommands" \
-    | column -s $'\t' -t
+    "${formatter:+|}" '"${formatter[@]}"'
 
 [ ! "$isSummarize" ] || summarizeProcessing
