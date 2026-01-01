@@ -154,7 +154,7 @@ summarizeProcessing()
 
 # Use \a\f (bell + form feed) as the marker for the title, so that we have
 # something unique to match for the ^ anchor. Remove after matching.
-khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format $'{start-date-long} {start-time}\t{end-date-long} {end-time} \t\a\f{title}' "${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?} ago" '+%F %R')}" "${KHAL_RANGE_END:-$(date --date "${KHAL_GREP_DATERANGE:?}" '+%F %R')}" \
+khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format $'{start-date-long} {start-time}\t{end-date-long} {end-time}\t\a\f{title}' "${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?} ago" '+%F %R')}" "${KHAL_RANGE_END:-$(date --date "${KHAL_GREP_DATERANGE:?}" '+%F %R')}" \
     | grep "${grepArgs[@]}" "$@" \
     | sed 's/\a\f//' \
     | eval 'reldate --relative-to-first --difference' \
