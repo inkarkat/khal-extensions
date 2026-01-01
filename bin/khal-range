@@ -19,8 +19,8 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Show all events / run KHAL-COMMAND with the passed range of dates determined by
-the events that match PATTERN.
+Show all events from / run KHAL-COMMAND with a range of dates determined by the
+events whose title matches PATTERN.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
@@ -114,8 +114,8 @@ doRange()
     fi
 }
 
-readonly ABSOLUTE_START=1970-01-01
-readonly ABSOLUTE_END=2099-12-31    # XXX: khal 0.13.0 scales linearly, and dates beyond the year 2999 cannot be parsed
+readonly ABSOLUTE_START='1970-01-01 00:00'
+readonly ABSOLUTE_END='2099-12-31 23:59'    # XXX: khal 0.13.0 scales linearly, and dates beyond the year 2999 cannot be parsed
 readonly SEARCH_START="${KHAL_RANGE_START:-$ABSOLUTE_START}"
 readonly SEARCH_END="${KHAL_RANGE_END:-$ABSOLUTE_END}"
 start="$SEARCH_START"
@@ -128,7 +128,7 @@ if [ "$isInverted" ]; then
     # the first (preceding) inverted range. For the end date, no such arithmetics is
     # necessary.
     type -t -- dateex >/dev/null && start="$(dateex --date "$start -1m" '+%F %R')"
-####D echo >&2 "**** $SEARCH_START / $start / $end / $SEARCH_END"
+    case ",${DEBUG:-}," in *,khal-range,*) printf >&2 '%skhal-range: %q / %q / %q / %q\n' "$PS4" "$SEARCH_START" "$start" "$end" "$SEARCH_END";; esac
 
     doRange "$SEARCH_START" "$start" "$@" | outputOrError --multiline --status 99; status=$?
 
@@ -142,5 +142,6 @@ if [ "$isInverted" ]; then
 	"${paddingCommand:+|}" '"${paddingCommand[@]}"' \
 	|| exit $status
 else
+    case ",${DEBUG:-}," in *,khal-range,*) printf >&2 '%skhal-range: %q / %q\n' "$PS4" "$start" "$end";; esac
     doRange "$start" "$end" "$@"
 fi
