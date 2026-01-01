@@ -15,4 +15,4 @@ esac
 
 KHAL_TIMESPAN_OVERALL_PRECISION='--precision h' \
 KHAL_TIMESPAN_QUADRANT_PRECISION='--workday' \
-exec khal-timespan "$@" "$(date +%Y)-01-01" today
+exec khal-timespan "$@" "$(date +%Y)-01-01 00:00" today
