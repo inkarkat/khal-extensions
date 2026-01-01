@@ -118,10 +118,14 @@ readonly ABSOLUTE_START='1970-01-01 00:00'
 readonly ABSOLUTE_END='2099-12-31 23:59'    # XXX: khal 0.13.0 scales linearly, and dates beyond the year 2999 cannot be parsed
 readonly SEARCH_START="${KHAL_RANGE_START:-$ABSOLUTE_START}"
 readonly SEARCH_END="${KHAL_RANGE_END:-$ABSOLUTE_END}"
+
 start="$SEARCH_START"
 [ -z "$fromPattern" ] || start="$(findDate start "$fromPattern" "$isFromLatest" "$fromCount")" || exit $?
+start="${start/% / 00:00}"  # Add time to all-day event.
+
 end="$SEARCH_END"
 [ -z "$toPattern" ] || end="$(findDate end "$toPattern" "$isToLatest" "$toCount")" || exit $?
+end="${end/% / 23:59}"	# Add time to all-day event.
 
 if [ "$isInverted" ]; then
     # Subtract one minute from the start time so that that event isn't included in
