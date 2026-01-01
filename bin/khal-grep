@@ -3,17 +3,16 @@ set -o pipefail
 shopt -qs extglob
 
 : ${KHAL_GREP_COMMAND_JOINER=|}
-: ${KHAL_GREP_DATERANGE:=3 months ago}
+: ${KHAL_GREP_DATERANGE:=3 months}
 : ${ENGINEERINGDAY_SECONDS:=$((6 * 3600))}
 : ${ENGINEERINGWEEK_SECONDS:=$((ENGINEERINGDAY_SECONDS * 5))}
 : ${ENGINEERING_PREFIX:=e}
-readonly ABSOLUTE_END=2099-12-31    # XXX: khal 0.13.0 scales linearly, and dates beyond the year 2999 cannot be parsed
 
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: [KHAL_GREP_DATERANGE=START_DATE] %q %s\n' "$(basename "$1")" '[-y|--summary-only|-Y|--no-summary] [--process PROCESSING-COMMAND [--process ...]] [KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
+    printf 'Usage: [KHAL_GREP_DATERANGE=TIMESPAN] %q %s\n' "$(basename "$1")" '[-y|--summary-only|-Y|--no-summary] [--process PROCESSING-COMMAND [--process ...]] [KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
 }
 printUsage()
 {
@@ -27,7 +26,7 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Show all events in the past ${KHAL_GREP_DATERANGE} that match PATTERN, followed
+Show all events in the past / future ${KHAL_GREP_DATERANGE} that match PATTERN, followed
 by a summary of the total duration and date range in which they were scheduled.
 HELPDESCRIPTION
     echo
@@ -155,7 +154,7 @@ summarizeProcessing()
 
 # Use \a\f (bell + form feed) as the marker for the title, so that we have
 # something unique to match for the ^ anchor. Remove after matching.
-khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format $'{start-date-long} {start-time}\t{end-date-long} {end-time} \t\a\f{title}' "${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?}" +%F)}" "${KHAL_RANGE_END:-$ABSOLUTE_END}" \
+khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format $'{start-date-long} {start-time}\t{end-date-long} {end-time} \t\a\f{title}' "${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?} ago" '+%F %R')}" "${KHAL_RANGE_END:-$(date --date "${KHAL_GREP_DATERANGE:?}" '+%F %R')}" \
     | grep "${grepArgs[@]}" "$@" \
     | sed 's/\a\f//' \
     | eval 'reldate --relative-to-first --difference' \

@@ -60,7 +60,8 @@ getMatchExpr()
     printf %s "^\\(${what}\\)\\( [[:digit:]]\\+ [[:alpha:]]\\+\\)${numberUnitMulti}${context}\$"
 }
 
-export KHAL_GREP_DATERANGE=1970-01-01
+: ${KHAL_RANGE_START=1970-01-01}; : ${KHAL_RANGE_END=2099-12-31}; export KHAL_RANGE_START KHAL_RANGE_END
+
 [ "$isSummaryOnly" ] || \
     khal-grep --color=never --no-summary \
 	--process 'field 1 2 3 4 5 6' \
