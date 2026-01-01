@@ -1,0 +1,51 @@
+#!/bin/bash
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, they can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '-e|--earliest PATTERN|-E|--latest PATTERN [-n|--count N] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Show all events from / run KHAL-COMMAND with a range of dates ending at the
+earliest or latest match of PATTERN in the event title.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --earliest|-e PATTERN
+			The earliest occurrence of PATTERN sets the end of the
+			range.
+    --latest|-E PATTERN	The latest occurrence of PATTERN sets the end of the
+			range.
+    --count|-n N	Use the N'th occurrence of PATTERN instead of the first.
+HELPTEXT
+}
+
+typeset -a args=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--earliest|--latest|--count)
+			args+=("--to-${1#--}" "${2:?}"); shift; shift;;
+	-e)		shift; args+=(--to-earliest "${1:?}"); shift;;
+	-E)		shift; args+=(--to-latest "${1:?}"); shift;;
+	-n)		shift; args+=(--to-count "${1:?}"); shift;;
+	--)		args+=("$1"); shift; break;;
+	*)		args+=("$1"); shift;;
+    esac
+done
+exec khal-range "${args[@]}" "$@"
