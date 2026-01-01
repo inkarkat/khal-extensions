@@ -1,0 +1,63 @@
+#!/bin/bash
+
+: ${KHAL_LASTYEAR_START_MONTH:=01}
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[(-o|--offset N|--year YEAR) [-n|--years M]] [-y|--summary-only|-Y|--no-summary] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Show all events (followed by the total duration) from / run KHAL-COMMAND with
+the range of dates that covers the entire fully passed (starting with month $KHAL_LASTYEAR_START_MONTH)
+last [M] year[s] / previous N'th year[s] / year YEAR [and M previous].
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --offset|-o N	Use the previous N'th year instead of the last year.
+    --year YEAR		Use YEAR instead of the last year.
+    --years|-n M	Use M previous years instead of a single year only.
+HELPTEXT
+}
+
+year=
+count=1
+typeset -a args=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--offset|-o)	shift; year="$(($(date +%Y) - ${1:?} - 1))"; shift;;
+	--year)		shift; year="${1:?}"; shift;;
+	--years|-n)	shift; count="${1:?}"; shift;;
+	--)		args+=("$1"); shift; break;;
+	*)		args+=("$1"); shift;;
+    esac
+done
+set -- "${args[@]}" "$@"
+
+if [ -z "$year" ]; then
+    year=$(date +%Y)
+    yearOffset=-2; [ "$(date +%m)" -ge $KHAL_LASTYEAR_START_MONTH ] && yearOffset=-1
+fi
+
+endYear=$((year + yearOffset + 1))
+startYear=$((endYear - count))
+
+KHAL_TIMESPAN_OVERALL_PRECISION='--precision h' \
+KHAL_TIMESPAN_QUADRANT_PRECISION='--workday' \
+exec khal-timespan "$@" "${startYear}-${KHAL_LASTYEAR_START_MONTH}-01 00:00" "${endYear}-${KHAL_LASTYEAR_START_MONTH}-01 00:00"
