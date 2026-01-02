@@ -12,7 +12,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: [KHAL_GREP_DATERANGE=TIMESPAN] %q %s\n' "$(basename "$1")" '[-y|--summary-only|-Y|--no-summary] [--process PROCESSING-COMMAND [--process ...]] [KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
+    printf 'Usage: [KHAL_GREP_DATERANGE=TIMESPAN] %q %s\n' "$(basename "$1")" '[--raw-dates] [-y|--summary-only|-Y|--no-summary] [--process PROCESSING-COMMAND [--process ...]] [KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
 }
 printUsage()
 {
@@ -33,6 +33,9 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
+    --raw-dates		Output separate start and end dates instead of start
+			date + duration. The summary will just show the event
+			count and date range, not the total durations.
     --summary-only|-y	Do not output the individual events; just show the total
 			effort and date range.
     --no-summary|-Y	Just output the individual events without total effort
@@ -48,6 +51,8 @@ typeset -a formatter=(column -s $'\t' -t)
 typeset -a grepArgs=()
 typeset -a khalMainArgs=()
 typeset -a khalListArgs=()
+typeset -a reldateCommand=(reldate --relative-to-first --difference)
+isFullTime=
 isShowEvents=t
 isSummarize=t
 unset processingCommands
@@ -68,6 +73,8 @@ do
 	-[ad])		khalListArgs+=("$1" "${2?}"); shift; shift;;
 	--@(include-calendar|exclude-calendar))
 			khalListArgs+=("$1" "${2?}"); shift; shift;;
+
+	--raw-dates)    shift; reldateCommand=(); isFullTime=t;;
 	--summary-only|-y)
 			shift; isShowEvents=;;
 	--no-summary|-Y)
@@ -84,7 +91,7 @@ if [ ${#grepArgs[@]} -eq 0 -a $# -eq 0 ]; then
     printUsage "$0" >&2
     exit 2
 fi
-: ${processingCommands="fieldMap -F '\t' 2 '|secondsToDuration --unbuffered --width 6'"}
+[ ${#reldateCommand[@]} -eq 0 ] || : ${processingCommands="fieldMap -F '\t' 2 '|secondsToDuration --unbuffered --width 6'"}
 
 getFifo()
 {
@@ -116,7 +123,11 @@ startEndPipeline()
 
 summarizer()
 {
-    sumField 3 | outputOrPrintf \\n >&3
+    if [ ${#reldateCommand[@]} -eq 0 ]; then
+	wc -l
+    else
+	sumField 3
+    fi | outputOrPrintf \\n >&3
 }
 summarizePipeline()
 {
@@ -128,12 +139,12 @@ summarizePipeline()
 }
 summarizeProcessing()
 {
-    local IFS=$'\n' summarySeconds start end dateDiff range
-    read summarySeconds <&3
+    local IFS=$'\n' summaryEventCountOrTotalSeconds start end dateDiff range
+    read summaryEventCountOrTotalSeconds <&3
     { read start; read end; } <&4
     exec 3>&- 4>&-
 
-    [ -n "$summarySeconds" -a -n "$start" -a -n "$end" ] || return
+    [ -n "$summaryEventCountOrTotalSeconds" -a -n "$start" -a -n "$end" ] || return
 
     if [ "$start" = "$end" ]; then
 	dateDiff='one day'
@@ -143,11 +154,18 @@ summarizeProcessing()
 	range="from $start until $end"
     fi
 
-    printf -- "${isShowEvents:+--\\n}Total effort: %s (%s) over %s (%s)\\n" \
-	"$(WORKDAY_SECONDS=$ENGINEERINGDAY_SECONDS WORKWEEK_SECONDS=$ENGINEERINGWEEK_SECONDS WORK_PREFIX="$ENGINEERING_PREFIX" secondsToDuration --workday --precision Ud -- "$summarySeconds")" \
-	"$(secondsToDuration --precision Uh -- "$summarySeconds")" \
-	"$dateDiff" \
-	"$range"
+    if [ ${#reldateCommand[@]} -eq 0 ]; then
+	printf -- "${isShowEvents:+--\\n}Total events: %s over %s (%s)\\n" \
+	    "$summaryEventCountOrTotalSeconds" \
+	    "$dateDiff" \
+	    "$range"
+    else
+	printf -- "${isShowEvents:+--\\n}Total effort: %s (%s) over %s (%s)\\n" \
+	    "$(WORKDAY_SECONDS=$ENGINEERINGDAY_SECONDS WORKWEEK_SECONDS=$ENGINEERINGWEEK_SECONDS WORK_PREFIX="$ENGINEERING_PREFIX" secondsToDuration --workday --precision Ud -- "$summaryEventCountOrTotalSeconds")" \
+	    "$(secondsToDuration --precision Uh -- "$summaryEventCountOrTotalSeconds")" \
+	    "$dateDiff" \
+	    "$range"
+    fi
 }
 
 
@@ -155,10 +173,15 @@ summarizeProcessing()
 
 # Use \a\f (bell + form feed) as the marker for the title, so that we have
 # something unique to match for the ^ anchor. Remove after matching.
-khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format $'{start-date-long} {start-time}\t{end-date-long} {end-time}\t\a\f{title}' "${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?} ago" '+%F %R')}" "${KHAL_RANGE_END:-$(date --date "${KHAL_GREP_DATERANGE:?}" '+%F %R')}" \
+removeTitleMarker()
+{
+    sed 's/\a\f//'
+}
+
+khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format "{start-date-long} {start-time${isFullTime:+-full}}"$'\t'"{end-date-long} {end-time${isFullTime:+-full}}"$'\t\a\f{title}' "${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?} ago" '+%F %R')}" "${KHAL_RANGE_END:-$(date --date "${KHAL_GREP_DATERANGE:?}" '+%F %R')}" \
     | grep "${grepArgs[@]}" "$@" \
-    | sed 's/\a\f//' \
-    | eval 'reldate --relative-to-first --difference' \
+    | eval removeTitleMarker \
+    "${reldateCommand:+|}" '"${reldateCommand[@]}"' \
     "${isSummarize:+| startEndPipeline}" \
     "${isSummarize:+| summarizePipeline}" \
     "${processingCommands:+|}$processingCommands" \
