@@ -63,11 +63,11 @@ getMatchExpr()
 : ${KHAL_RANGE_START=1970-01-01}; : ${KHAL_RANGE_END=2099-12-31}; export KHAL_RANGE_START KHAL_RANGE_END
 
 [ "$isSummaryOnly" ] || \
-    khal-grep --color=never --no-summary \
+    khal-grep --no-color --no-summary \
 	--process 'field 1 2 3 4 5 6' \
 	--process 'sumField --group-by -1 --result-first -2' \
 	-e "$(getMatchExpr '')" \
 	"$@"
-khal-grep --color=never --summary-only \
+khal-grep --no-color --summary-only \
     -e "$(getMatchExpr '\?')" \
     "$@"
