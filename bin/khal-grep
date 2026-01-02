@@ -64,6 +64,7 @@ do
 	-[vlc])		khalMainArgs+=("$1" "${2?}"); shift; shift;;
 	--@(verbosity|logfile|config))
 			khalMainArgs+=("$1" "${2?}"); shift; shift;;
+	--once)		khalListArgs+=("$1"); shift;;
 	-[ad])		khalListArgs+=("$1" "${2?}"); shift; shift;;
 	--@(include-calendar|exclude-calendar))
 			khalListArgs+=("$1" "${2?}"); shift; shift;;
