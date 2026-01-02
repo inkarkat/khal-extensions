@@ -32,21 +32,22 @@ printLongUsage()
     cat <<HELPDESCRIPTION
 Print the distribution of event durations that fall into the graphed range.
 Depending on the range, this will be the distribution over the day, month, or
-over year(s) (for anything longer). All-day events are ignored.
+over year(s) (for anything longer). All-day events contribute no duration.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
     --regexp|-e PATTERN	Graph the total duration of all events that match
-			PATTERN.
+			PATTERN (a grep-style unanchored basic regular
+			expression).
     --tally "WHAT-PATTERN [CONTEXT ...]"
 			Graph all events whose title matches WHAT-PATTERN
 			[NUMBER UNIT] [CONTEXT ...].
 			WHAT-PATTERN is a grep-style anchored basic regular
-			expresion. If there are NUMBER(s), add up all regardless
-			of their UNIT(s); without NUMBER, use the event's
-			duration (like with --regexp).
+			expression. If there are NUMBER(s), add up all
+			regardless of their UNIT(s); without NUMBER, use the
+			event's duration (like with --regexp).
     --number-factor N	Multiply each NUMBER with N to make the numbers
 			comparable to the duration seconds that are used when
 			there's no NUMBER. For example, a factor of 360 makes an

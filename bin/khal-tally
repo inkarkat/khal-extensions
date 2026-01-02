@@ -19,7 +19,7 @@ printLongUsage()
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
 Show all events whose title matches WHAT-PATTERN [NUMBER UNIT] [CONTEXT ...].
-WHAT-PATTERN is a grep-style anchored basic regular expresion.
+WHAT-PATTERN is a grep-style anchored basic regular expression.
 If there are NUMBER(s), extract all for each UNIT and show their sums.
 Print a summary of the total duration and date range in which they were
 scheduled.
