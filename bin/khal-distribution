@@ -91,18 +91,35 @@ do
 done
 khalArgs+=("$@")
 
-wholeAndMultiDayToZero()
+handleAllAndMultiDay()
 {
-    fieldMap -F '\t' 2 '$fieldNr >= 86400 ? 0 : $fieldNr'
+    # All-day events are graphed as zero-duration, so that they are rendered as a
+    # zero value if there are no other events on that day, and are completely
+    # ignored if there are other events.
+    # Multi-day events should cover all days; typically these are all-day events,
+    # but the implementation also handles normal ranges that just cross a day
+    # border. Incomplete days are rendered as normal events (stopping / starting at
+    # midnight), whereas full days have zero duration like all-day events.
+    awk -F '[[:space:]:-]' '
+$1 "-" $2 "-" $3 != $6 "-" $7 "-" $8 {
+    print $1 "-" $2 "-" $3 " " ($4 == 0 && $5 == 0 ? "00:00\t0" : $4 ":" $5 "\t" $1 "-" $2 "-" $3 " 23:59")
+
+    endEpoch = mktime($6 " " $7 " " $8 " 00 00 00", 1)
+    for (epoch = mktime($1 " " $2 " " $3 " 00 00 00", 1) + 86400; epoch < endEpoch; epoch += 86400) {
+	print strftime("%Y-%m-%d 00:00\t0", epoch, 1)
+    }
+    print $6 "-" $7 "-" $8 " 00:00\t" ($9 == 0 && $10 == 0 ? "0" : $6 "-" $7 "-" $8 " " $9 ":" $10)
+
+    next
+}
+{ print; }
+' \
+    | sort --numeric-sort
 }
 
 getDurations()
 {
-    # Note: Do not use --once here; for multi-day events, we'll want to count every
-    # day separately and instead set it's length to 0.
-    khal-wrapper list --no-color --day-format '' --format $'{start-date-long} {start-time-full}\t{end-date-long} {end-time-full}' "${khalArgs[@]}" "${KHAL_RANGE_START:-$(date --date "${KHAL_DISTRIBUTION_DATERANGE:?}" +%F)}" "${KHAL_RANGE_END:-$ABSOLUTE_END}" \
-	| reldate --relative-to-first --difference \
-	| wholeAndMultiDayToZero
+    khal-wrapper list --no-color --once --day-format '' --format $'{start-date-long} {start-time-full}\t{end-date-long} {end-time-full}' "${khalArgs[@]}" "${KHAL_RANGE_START:-$(date --date "${KHAL_DISTRIBUTION_DATERANGE:?}" +%F)}" "${KHAL_RANGE_END:-$ABSOLUTE_END}"
 }
 
 getLogs()
@@ -116,5 +133,7 @@ printGraph()
     $distributionCommand --count-field 6 "${distributionBaseDateArg[@]}" "${distributionReversedArg[@]}" "${distributionMinArg[@]}" "${distributionArgs[@]}"
 }
 
-# getLogs; exit
-getLogs | printGraph
+getLogs \
+    | handleAllAndMultiDay \
+    | reldate --relative-to-first --difference \
+    | printGraph
