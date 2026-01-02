@@ -7,7 +7,7 @@ readonly ABSOLUTE_END=2099-12-31    # XXX: khal 0.13.0 scales linearly, and date
 
 printShortUsage()
 {
-    local commonArguments='[-e|--regexp PATTERN [-e ...]|--tally "WHAT-PATTERN [CONTEXT ...]" [--unit UNIT]]'
+    local commonArguments='[-e|--regexp PATTERN [-e ...]|--tally "WHAT-PATTERN [CONTEXT ...]" [--number-factor N] [--unit UNIT]]'
     local distributionCommonArguments='[--color=(always|auto|never)|--no-color] [--as colorbox-calendar|green-[large-]calendar|...]'
     local distributionOverAutorangeArguments='[--no-footer|--final-footer-only|footer-only-on-change|--footer-every N] [--force-legends] [--bucket-legend] [--over day|month|year|year-weekly|--weekly]'
     local distributionAutolinearArguments='-l|--linear [-w|--width W] [--no-today-base-date|--base-date today|"YYYY MM DD"] [--no-start-date] [--no-end-date] [--days-per-slot N|--slots-per-day N] [--reversed]'
@@ -47,6 +47,10 @@ HELPDESCRIPTION
 			expresion. If there are NUMBER(s), add up all regardless
 			of their UNIT(s); without NUMBER, use the event's
 			duration (like with --regexp).
+    --number-factor N	Multiply each NUMBER with N to make the numbers
+			comparable to the duration seconds that are used when
+			there's no NUMBER. For example, a factor of 360 makes an
+			one-hour event equivalent to a number of 10.
     --unit UNIT		Just add up WHAT-PATTERN matches for the passed UNIT;
 			ignore all other units or matches without NUMBER.
     --linear|-l		Choose a linear representation in one line with
@@ -71,6 +75,7 @@ sourceProcessor=
 typeset -a grepArgs=()
 tallyWhat=
 tallyContext=
+tallyNumberFactor=
 tallyUnit=
 while [ $# -ne 0 ]
 do
@@ -103,6 +108,8 @@ do
 			sourceCommand=getTally
 			sourceProcessor=processTally
 			;;
+	--number-factor)
+			shift; tallyNumberFactor="${1:?}"; shift;;
 	--unit)		shift; tallyUnit="${1:?}"; shift;;
 
 	--)		khalArgs+=("$1"); shift; break;;
@@ -155,12 +162,21 @@ getTally()
     khal-grep --no-color --once --no-summary --raw-dates -e "$matchExpr"
 }
 
-processTally()
+extractTallyNumber()
 {
     sed \
 	-e "s#\\t[[:digit:] :-]\\+\\t\\(${tallyWhat}\\) \\([[:digit:]]\\+\\) [[:alpha:]]\\+.*\$#\\t\\2#" \
 	-e t \
 	-e "s#\\t\\(${tallyWhat}\\).*\$##"
+}
+applyNumberFactor()
+{
+    fieldMap -F '\t' -v numberFactor="$tallyNumberFactor" 2 '$fieldNr ~ /^[[:digit:]]+$/ ? $fieldNr * numberFactor : $fieldNr'
+}
+processTally()
+{
+    eval extractTallyNumber \
+	"${tallyNumberFactor:+| applyNumberFactor}"
 }
 
 
