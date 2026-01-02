@@ -1,0 +1,192 @@
+#!/bin/bash
+set -o pipefail
+shopt -qs extglob
+
+: ${KHAL_DISTRIBUTION_DATERANGE:=3 months ago}
+readonly ABSOLUTE_END=2099-12-31    # XXX: khal 0.13.0 scales linearly, and dates beyond the year 2999 cannot be parsed
+
+printShortUsage()
+{
+    local commonArguments='[-e|--regexp PATTERN [-e ...]|--tally "WHAT-PATTERN [CONTEXT ...]" [--number-factor N] [--unit UNIT]]'
+    local distributionCommonArguments='[--color=(always|auto|never)|--no-color] [--as colorbox-calendar|green-[large-]calendar|...]'
+    local distributionOverAutorangeArguments='[--no-footer|--final-footer-only|footer-only-on-change|--footer-every N] [--force-legends] [--bucket-legend] [--over day|month|year|year-weekly|--weekly]'
+    local distributionAutolinearArguments='-l|--linear [-w|--width W] [--no-today-base-date|--base-date today|"YYYY MM DD"] [--no-start-date] [--no-end-date] [--days-per-slot N|--slots-per-day N] [--reversed]'
+    local khalArguments='[KHAL-ARGS ...]'
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s %s %s %s %s\n' "$(basename "$1")" "$commonArguments" "$distributionOverAutorangeArguments" "${distributionCommonArguments[@]}" "$khalArguments" '[-?|-h|--help]'
+    echo
+    printf 'Usage: %q %s %s %s %s %s\n' "$(basename "$1")" "$commonArguments" "$distributionAutolinearArguments" "${distributionCommonArguments[@]}" "$khalArguments" '[-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Print the distribution of event durations that fall into the graphed range.
+Depending on the range, this will be the distribution over the day, month, or
+over year(s) (for anything longer). All-day events contribute no duration.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --regexp|-e PATTERN	Graph the total duration of all events that match
+			PATTERN (a grep-style unanchored basic regular
+			expression).
+    --tally "WHAT-PATTERN [CONTEXT ...]"
+			Graph all events whose title matches WHAT-PATTERN
+			[NUMBER UNIT] [CONTEXT ...].
+			WHAT-PATTERN is a grep-style anchored basic regular
+			expression. If there are NUMBER(s), add up all
+			regardless of their UNIT(s); without NUMBER, use the
+			event's duration (like with --regexp).
+    --number-factor N	Multiply each NUMBER with N to make the numbers
+			comparable to the duration seconds that are used when
+			there's no NUMBER. For example, a factor of 360 makes an
+			one-hour event equivalent to a number of 10.
+    --unit UNIT		Just add up WHAT-PATTERN matches for the passed UNIT;
+			ignore all other units or matches without NUMBER.
+    --linear|-l		Choose a linear representation in one line with
+			auto-scaling of the time instead of the fixed reporting
+			over day, month, years.
+    --no-today-base-date
+			Disable basing the end of the range on today (which
+			makes for a uniform alignment of multiple graphs (unless
+			reversed), but can squash the scale if the actual range
+			is deep in the past).
+HELPTEXT
+}
+
+distributionCommand=distribution-over-autorange
+typeset -a distributionArgs=()
+typeset -a distributionBaseDateArg=()
+typeset -a distributionReversedArg=()
+typeset -a distributionMinArg=(--min 0)
+typeset -a khalArgs=()
+sourceCommand=getDurations
+sourceProcessor=
+typeset -a grepArgs=()
+tallyWhat=
+tallyContext=
+tallyNumberFactor=
+tallyUnit=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--linear|-l)	shift; distributionCommand=distribution-autolinear; distributionBaseDateArg=(--base-date today); distributionReversedArg=(--reversed);;
+
+	-[S])           distributionArgs+=("$1"); shift;;
+	--@(no-footer|final-footer-only|footer-only-on-change|no-splitting|weekly|force-legends|no-start-date|no-end-date|no-day-zoom|no-color|color=*))
+			distributionArgs+=("$1"); shift;;
+	-[w])           distributionArgs+=("$1" "$2"); shift; shift;;
+	--@(bucket-legend|footer-every|graph-legend|footer-legend|as|over|width|days-per-slot|slots-per-day|max|scale))
+			distributionArgs+=("$1" "$2"); shift; shift;;
+	--color)	shift; distributionArgs+=(--color=always);;
+	--min)		distributionMinArg=("$1" "$2"); shift; shift;;
+	--base-date)	distributionBaseDateArg=("$1" "$2"); shift; shift;;
+	--no-today-base-date)
+			distributionBaseDateArg=(); shift;;
+	--reversed)	shift; distributionReversedArg=();;
+
+	--regexp|-e)	grepArgs+=("$1" "${2:?}"); shift; shift; sourceCommand=getMatches;;
+	--tally)	shift
+			if [[ "$1" =~ ^([^[:space:]]+)[[:space:]]+(.*)$ ]]; then
+			    tallyWhat="${BASH_REMATCH[1]}"
+			    tallyContext="${BASH_REMATCH[2]:+ }${BASH_REMATCH[2]}"
+			else
+			    tallyWhat="${1:?}"
+			    tallyContext='\([[:space:]].*\)\?'
+			fi; shift
+			sourceCommand=getTally
+			sourceProcessor=processTally
+			;;
+	--number-factor)
+			shift; tallyNumberFactor="${1:?}"; shift;;
+	--unit)		shift; tallyUnit="${1:?}"; shift;;
+
+	--)		khalArgs+=("$1"); shift; break;;
+	*)		khalArgs+=("$1"); shift;;
+    esac
+done
+khalArgs+=("$@")
+
+getDurations()
+{
+    khal-wrapper list --no-color --once --day-format '' --format $'{start-date-long} {start-time-full}\t{end-date-long} {end-time-full}' "${khalArgs[@]}" "${KHAL_RANGE_START:-$(date --date "${KHAL_DISTRIBUTION_DATERANGE:?}" +%F)}" "${KHAL_RANGE_END:-$ABSOLUTE_END}"
+}
+
+getMatches()
+{
+    khal-grep --no-color --once --no-summary --raw-dates "${grepArgs[@]}"
+}
+
+getTally()
+{
+    [ -n "$tallyUnit" ] \
+	&& local matchExpr="^\\(${tallyWhat}\\)\\( [[:digit:]]\\+ ${tallyUnit}\\)${tallyContext}\$" \
+	|| local matchExpr="^\\(${tallyWhat}\\)\\( [[:digit:]]\\+ [[:alpha:]]\\+\\)\\?${tallyContext}\$"
+    khal-grep --no-color --once --no-summary --raw-dates -e "$matchExpr"
+}
+extractTallyNumber()
+{
+    sed \
+	-e "s#\\t[[:digit:] :-]\\+\\t\\(${tallyWhat}\\) \\([[:digit:]]\\+\\) [[:alpha:]]\\+.*\$#\\t\\2#" \
+	-e t \
+	-e "s#\\t\\(${tallyWhat}\\).*\$##"
+}
+applyNumberFactor()
+{
+    fieldMap -F '\t' -v numberFactor="$tallyNumberFactor" 2 '$fieldNr ~ /^[[:digit:]]+$/ ? $fieldNr * numberFactor : $fieldNr'
+}
+processTally()
+{
+    eval extractTallyNumber \
+	"${tallyNumberFactor:+| applyNumberFactor}"
+}
+
+
+handleAllAndMultiDay()
+{
+    # All-day events are graphed as zero-duration, so that they are rendered as a
+    # zero value if there are no other events on that day, and are completely
+    # ignored if there are other events.
+    # Multi-day events should cover all days; typically these are all-day events,
+    # but the implementation also handles normal ranges that just cross a day
+    # border. Incomplete days are rendered as normal events (stopping / starting at
+    # midnight), whereas full days have zero duration like all-day events.
+    awk -F '[[:space:]:-]' -v alldayTime="12:00" '
+$1 "-" $2 "-" $3 != $6 "-" $7 "-" $8 {
+    print $1 "-" $2 "-" $3 " " ($4 == 0 && $5 == 0 ? alldayTime "\t0" : $4 ":" $5 "\t" $1 "-" $2 "-" $3 " 23:59")
+
+    endEpoch = mktime($6 " " $7 " " $8 " 00 00 00", 1)
+    for (epoch = mktime($1 " " $2 " " $3 " 00 00 00", 1) + 86400; epoch < endEpoch; epoch += 86400) {
+	print strftime("%Y-%m-%d " alldayTime "\t0", epoch, 1)
+    }
+    print $6 "-" $7 "-" $8 " " ($9 == 0 && $10 == 0 ? alldayTime "\t0" : "00:00\t" $6 "-" $7 "-" $8 " " $9 ":" $10)
+
+    next
+}
+{ print; }
+' \
+    | sort --numeric-sort
+}
+
+printGraph()
+{
+    $distributionCommand --count-field 6 "${distributionBaseDateArg[@]}" "${distributionReversedArg[@]}" "${distributionMinArg[@]}" "${distributionArgs[@]}"
+}
+
+$sourceCommand \
+    | eval handleAllAndMultiDay \
+    "${sourceProcessor:+|}$sourceProcessor" \
+    | reldate --relative-to-first --difference \
+    | printGraph

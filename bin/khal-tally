@@ -19,7 +19,7 @@ printLongUsage()
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
 Show all events whose title matches WHAT-PATTERN [NUMBER UNIT] [CONTEXT ...].
-WHAT-PATTERN is a grep-style anchored basic regular expresion.
+WHAT-PATTERN is a grep-style anchored basic regular expression.
 If there are NUMBER(s), extract all for each UNIT and show their sums.
 Print a summary of the total duration and date range in which they were
 scheduled.
@@ -63,11 +63,11 @@ getMatchExpr()
 : ${KHAL_RANGE_START=1970-01-01}; : ${KHAL_RANGE_END=2099-12-31}; export KHAL_RANGE_START KHAL_RANGE_END
 
 [ "$isSummaryOnly" ] || \
-    khal-grep --no-color --no-summary \
+    khal-grep --no-color --once --no-summary \
 	--process 'field 1 2 3 4 5 6' \
 	--process 'sumField --group-by -1 --result-first -2' \
 	-e "$(getMatchExpr '')" \
 	"$@"
-khal-grep --no-color --summary-only \
+khal-grep --no-color --once --summary-only \
     -e "$(getMatchExpr '\?')" \
     "$@"
