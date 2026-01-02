@@ -118,6 +118,41 @@ do
 done
 khalArgs+=("$@")
 
+getDurations()
+{
+    khal-wrapper list --no-color --once --day-format '' --format $'{start-date-long} {start-time-full}\t{end-date-long} {end-time-full}' "${khalArgs[@]}" "${KHAL_RANGE_START:-$(date --date "${KHAL_DISTRIBUTION_DATERANGE:?}" +%F)}" "${KHAL_RANGE_END:-$ABSOLUTE_END}"
+}
+
+getMatches()
+{
+    khal-grep --no-color --once --no-summary --raw-dates "${grepArgs[@]}"
+}
+
+getTally()
+{
+    [ -n "$tallyUnit" ] \
+	&& local matchExpr="^\\(${tallyWhat}\\)\\( [[:digit:]]\\+ ${tallyUnit}\\)${tallyContext}\$" \
+	|| local matchExpr="^\\(${tallyWhat}\\)\\( [[:digit:]]\\+ [[:alpha:]]\\+\\)\\?${tallyContext}\$"
+    khal-grep --no-color --once --no-summary --raw-dates -e "$matchExpr"
+}
+extractTallyNumber()
+{
+    sed \
+	-e "s#\\t[[:digit:] :-]\\+\\t\\(${tallyWhat}\\) \\([[:digit:]]\\+\\) [[:alpha:]]\\+.*\$#\\t\\2#" \
+	-e t \
+	-e "s#\\t\\(${tallyWhat}\\).*\$##"
+}
+applyNumberFactor()
+{
+    fieldMap -F '\t' -v numberFactor="$tallyNumberFactor" 2 '$fieldNr ~ /^[[:digit:]]+$/ ? $fieldNr * numberFactor : $fieldNr'
+}
+processTally()
+{
+    eval extractTallyNumber \
+	"${tallyNumberFactor:+| applyNumberFactor}"
+}
+
+
 handleAllAndMultiDay()
 {
     # All-day events are graphed as zero-duration, so that they are rendered as a
@@ -143,42 +178,6 @@ $1 "-" $2 "-" $3 != $6 "-" $7 "-" $8 {
 ' \
     | sort --numeric-sort
 }
-
-getDurations()
-{
-    khal-wrapper list --no-color --once --day-format '' --format $'{start-date-long} {start-time-full}\t{end-date-long} {end-time-full}' "${khalArgs[@]}" "${KHAL_RANGE_START:-$(date --date "${KHAL_DISTRIBUTION_DATERANGE:?}" +%F)}" "${KHAL_RANGE_END:-$ABSOLUTE_END}"
-}
-
-getMatches()
-{
-    khal-grep --no-color --once --no-summary --raw-dates "${grepArgs[@]}"
-}
-
-getTally()
-{
-    [ -n "$tallyUnit" ] \
-	&& local matchExpr="^\\(${tallyWhat}\\)\\( [[:digit:]]\\+ ${tallyUnit}\\)${tallyContext}\$" \
-	|| local matchExpr="^\\(${tallyWhat}\\)\\( [[:digit:]]\\+ [[:alpha:]]\\+\\)\\?${tallyContext}\$"
-    khal-grep --no-color --once --no-summary --raw-dates -e "$matchExpr"
-}
-
-extractTallyNumber()
-{
-    sed \
-	-e "s#\\t[[:digit:] :-]\\+\\t\\(${tallyWhat}\\) \\([[:digit:]]\\+\\) [[:alpha:]]\\+.*\$#\\t\\2#" \
-	-e t \
-	-e "s#\\t\\(${tallyWhat}\\).*\$##"
-}
-applyNumberFactor()
-{
-    fieldMap -F '\t' -v numberFactor="$tallyNumberFactor" 2 '$fieldNr ~ /^[[:digit:]]+$/ ? $fieldNr * numberFactor : $fieldNr'
-}
-processTally()
-{
-    eval extractTallyNumber \
-	"${tallyNumberFactor:+| applyNumberFactor}"
-}
-
 
 printGraph()
 {
