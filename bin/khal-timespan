@@ -159,7 +159,7 @@ summarizeProcessing()
 
 [ ! "$isSummarize" ] || summarizeSetup
 
-khal-wrapper list "${colorArg[@]}" "$@" --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "$start" "$end" \
+khal-wrapper list "${colorArg[@]}" --once --day-format '' --format '{start-date-long} {start-time} {end-date-long} {end-time} {title}' "$@" "$start" "$end" \
     | eval 'reldate --relative-to-first --difference' \
     "${isSummarize:+| quadrantPipeline}" \
     "${isSummarize:+| summarizePipeline}" \

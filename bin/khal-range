@@ -92,7 +92,7 @@ findDate()
     local isLatestFirst="${1?}"; shift
     local count="${1:?}"; shift
 
-    khal-wrapper list "${khalArgs[@]}" --day-format '' --format "{${what}-date-long} {${what}-time}"$'\t\a\f'"{title}" "$SEARCH_START" "$SEARCH_END" \
+    khal-wrapper list --no-color --once --day-format '' --format "{${what}-date-long} {${what}-time}"$'\t\a\f'"{title}" "${khalArgs[@]}" "$SEARCH_START" "$SEARCH_END" \
 	| eval "grep -e \"\${pattern//^/\$'\t\a\f'}\"" \
 	"${isLatestFirst:+| tac}" \
 	| sed -n "${count}s/\t\a\f.*\$//p" \
