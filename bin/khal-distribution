@@ -7,7 +7,7 @@ readonly ABSOLUTE_END=2099-12-31    # XXX: khal 0.13.0 scales linearly, and date
 
 printShortUsage()
 {
-    local commonArguments='[-e|--regexp PATTERN|TODO]'
+    local commonArguments='[-e|--regexp PATTERN [-e ...]|TODO]'
     local distributionCommonArguments='[--color=(always|auto|never)|--no-color] [--as colorbox-calendar|green-[large-]calendar|...]'
     local distributionOverAutorangeArguments='[--no-footer|--final-footer-only|footer-only-on-change|--footer-every N] [--force-legends] [--bucket-legend] [--over day|month|year|year-weekly|--weekly]'
     local distributionAutolinearArguments='-l|--linear [-w|--width W] [--no-today-base-date|--base-date today|"YYYY MM DD"] [--no-start-date] [--no-end-date] [--days-per-slot N|--slots-per-day N] [--reversed]'
@@ -66,6 +66,7 @@ typeset -a distributionReversedArg=()
 typeset -a distributionMinArg=(--min 0)
 typeset -a khalArgs=()
 typeset -a sourceLogCommand=(getDurations)
+typeset -a grepArgs=()
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -84,6 +85,8 @@ do
 	--no-today-base-date)
 			distributionBaseDateArg=(); shift;;
 	--reversed)	shift; distributionReversedArg=();;
+
+	--regexp|-e)	grepArgs+=("$1" "${2:?}"); shift; shift; sourceLogCommand=(getMatches);;
 
 	--)		khalArgs+=("$1"); shift; break;;
 	*)		khalArgs+=("$1"); shift;;
@@ -120,6 +123,11 @@ $1 "-" $2 "-" $3 != $6 "-" $7 "-" $8 {
 getDurations()
 {
     khal-wrapper list --no-color --once --day-format '' --format $'{start-date-long} {start-time-full}\t{end-date-long} {end-time-full}' "${khalArgs[@]}" "${KHAL_RANGE_START:-$(date --date "${KHAL_DISTRIBUTION_DATERANGE:?}" +%F)}" "${KHAL_RANGE_END:-$ABSOLUTE_END}"
+}
+
+getMatches()
+{
+    khal-grep --no-color --once --no-summary --raw-dates "${grepArgs[@]}"
 }
 
 getLogs()
