@@ -100,15 +100,15 @@ handleAllAndMultiDay()
     # but the implementation also handles normal ranges that just cross a day
     # border. Incomplete days are rendered as normal events (stopping / starting at
     # midnight), whereas full days have zero duration like all-day events.
-    awk -F '[[:space:]:-]' '
+    awk -F '[[:space:]:-]' -v alldayTime="12:00" '
 $1 "-" $2 "-" $3 != $6 "-" $7 "-" $8 {
-    print $1 "-" $2 "-" $3 " " ($4 == 0 && $5 == 0 ? "00:00\t0" : $4 ":" $5 "\t" $1 "-" $2 "-" $3 " 23:59")
+    print $1 "-" $2 "-" $3 " " ($4 == 0 && $5 == 0 ? alldayTime "\t0" : $4 ":" $5 "\t" $1 "-" $2 "-" $3 " 23:59")
 
     endEpoch = mktime($6 " " $7 " " $8 " 00 00 00", 1)
     for (epoch = mktime($1 " " $2 " " $3 " 00 00 00", 1) + 86400; epoch < endEpoch; epoch += 86400) {
-	print strftime("%Y-%m-%d 00:00\t0", epoch, 1)
+	print strftime("%Y-%m-%d " alldayTime "\t0", epoch, 1)
     }
-    print $6 "-" $7 "-" $8 " 00:00\t" ($9 == 0 && $10 == 0 ? "0" : $6 "-" $7 "-" $8 " " $9 ":" $10)
+    print $6 "-" $7 "-" $8 " " ($9 == 0 && $10 == 0 ? alldayTime "\t0" : "00:00\t" $6 "-" $7 "-" $8 " " $9 ":" $10)
 
     next
 }
