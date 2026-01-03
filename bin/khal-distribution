@@ -48,10 +48,10 @@ HELPDESCRIPTION
 			expression. If there are NUMBER(s), add up all
 			regardless of their UNIT(s); without NUMBER, use the
 			event's duration (like with --regexp).
-    --number-factor N	Multiply each NUMBER with N to make the numbers
-			comparable to the duration seconds that are used when
-			there's no NUMBER. For example, a factor of 360 makes an
-			one-hour event equivalent to a number of 10.
+    --number-factor N	Multiply each duration (of events without a NUMBER;
+			counted in hours) with N to make the durations
+			comparable to the NUMBERs. In other words, a factor of N
+			makes an one-hour event equivalent to a number of N.
     --unit UNIT		Just add up WHAT-PATTERN matches for the passed UNIT;
 			ignore all other units or matches without NUMBER.
     --linear|-l		Choose a linear representation in one line with
@@ -72,7 +72,8 @@ typeset -a distributionReversedArg=()
 typeset -a distributionMinArg=(--min 0)
 typeset -a khalArgs=()
 sourceCommand=getDurations
-sourceProcessor=
+sourcePreProcessor=
+sourcePostProcessor=
 typeset -a grepArgs=()
 tallyWhat=
 tallyContext=
@@ -107,10 +108,10 @@ do
 			    tallyContext='\([[:space:]].*\)\?'
 			fi; shift
 			sourceCommand=getTally
-			sourceProcessor=processTally
+			sourcePreProcessor=preProcessTally
 			;;
 	--number-factor)
-			shift; tallyNumberFactor="${1:?}"; shift;;
+			shift; tallyNumberFactor=$((3600 / ${1:?})); shift; sourcePostProcessor=applyNumberFactor;;
 	--unit)		shift; tallyUnit="${1:?}"; shift;;
 
 	--)		khalArgs+=("$1"); shift; break;;
@@ -143,14 +144,20 @@ extractTallyNumber()
 	-e t \
 	-e "s#\\t\\(${tallyWhat}\\).*\$##"
 }
-applyNumberFactor()
+counterbalanceNumberFactorInRecordedNumbers()
 {
-    fieldMap -F '\t' -v numberFactor="$tallyNumberFactor" 2 '$fieldNr ~ /^[[:digit:]]+$/ ? $fieldNr * numberFactor : $fieldNr'
+    fieldMap -F '\t' -v numberFactor="$tallyNumberFactor" \
+	    2 '$fieldNr ~ /^[[:digit:]]+$/ ? $fieldNr * numberFactor : $fieldNr'
 }
-processTally()
+preProcessTally()
 {
     eval extractTallyNumber \
-	"${tallyNumberFactor:+| applyNumberFactor}"
+	"${tallyNumberFactor:+| counterbalanceNumberFactorInRecordedNumbers}"
+}
+applyNumberFactor()
+{
+    fieldMap -F '\t' -v numberFactor="$tallyNumberFactor" \
+	    2 'int($fieldNr / numberFactor)'
 }
 
 
@@ -187,6 +194,7 @@ printGraph()
 
 $sourceCommand \
     | eval handleAllAndMultiDay \
-    "${sourceProcessor:+|}$sourceProcessor" \
-    | reldate --relative-to-first --difference \
+    "${sourcePreProcessor:+|}$sourcePreProcessor" \
+    '| reldate --relative-to-first --difference' \
+    "${sourcePostProcessor:+|}$sourcePostProcessor" \
     | printGraph
