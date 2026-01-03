@@ -9,7 +9,7 @@ printShortUsage()
 {
     local commonArguments='[-e|--regexp PATTERN [-e ...]|--tally "WHAT-PATTERN [CONTEXT ...]" [--number-factor N] [--unit UNIT]]'
     local distributionCommonArguments='[--color=(always|auto|never)|--no-color] [--as colorbox-calendar|green-[large-]calendar|...]'
-    local distributionOverAutorangeArguments='[--no-footer|--final-footer-only|footer-only-on-change|--footer-every N] [--force-legends] [--bucket-legend] [--over day|month|year|year-weekly|--weekly]'
+    local distributionOverAutorangeArguments='[--no-footer|--final-footer-only|footer-only-on-change|--footer-every N] [--force-legends] [--bucket-legend [--legend-unit UNIT]] [--over day|month|year|year-weekly|--weekly]'
     local distributionAutolinearArguments='-l|--linear [-w|--width W] [--no-today-base-date|--base-date today|"YYYY MM DD"] [--no-start-date] [--no-end-date] [--days-per-slot N|--slots-per-day N] [--reversed]'
     local khalArguments='[KHAL-ARGS ...]'
     # Note: short followed by long option; if the user knows the short one, she can
@@ -89,7 +89,7 @@ do
 	--@(no-footer|final-footer-only|footer-only-on-change|bucket-legend|no-splitting|weekly|force-legends|no-start-date|no-end-date|no-day-zoom|no-color|color=*))
 			distributionArgs+=("$1"); shift;;
 	-[w])           distributionArgs+=("$1" "$2"); shift; shift;;
-	--@(footer-every|graph-legend|footer-legend|as|over|width|days-per-slot|slots-per-day|max|scale))
+	--@(footer-every|graph-legend|footer-legend|legend-unit|as|over|width|days-per-slot|slots-per-day|max|scale))
 			distributionArgs+=("$1" "$2"); shift; shift;;
 	--color)	shift; distributionArgs+=(--color=always);;
 	--min)		distributionMinArg=("$1" "$2"); shift; shift;;
@@ -112,7 +112,7 @@ do
 			;;
 	--number-factor)
 			shift; tallyNumberFactor=$((3600 / ${1:?})); shift; sourcePostProcessor=applyNumberFactor;;
-	--unit)		shift; tallyUnit="${1:?}"; shift;;
+	--unit)		shift; tallyUnit="${1:?}"; distributionArgs+=(--legend-unit "$1"); shift;;
 
 	--)		khalArgs+=("$1"); shift; break;;
 	*)		khalArgs+=("$1"); shift;;
