@@ -74,6 +74,7 @@ typeset -a khalArgs=()
 sourceCommand=getDurations
 sourcePreProcessor=handleAllAndMultiDay
 sourcePostProcessor=
+countField=6
 typeset -a grepArgs=()
 tallyWhat=
 tallyContext=
@@ -190,7 +191,7 @@ $1 "-" $2 "-" $3 != $6 "-" $7 "-" $8 {
 
 printGraph()
 {
-    $distributionCommand --count-field 6 "${distributionBaseDateArg[@]}" "${distributionReversedArg[@]}" "${distributionMinArg[@]}" "${distributionArgs[@]}"
+    $distributionCommand ${countField:+--count-field $countField} "${distributionBaseDateArg[@]}" "${distributionReversedArg[@]}" "${distributionMinArg[@]}" "${distributionArgs[@]}"
 }
 
 eval '$sourceCommand' \
