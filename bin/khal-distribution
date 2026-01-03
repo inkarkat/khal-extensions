@@ -7,7 +7,7 @@ readonly ABSOLUTE_END=2099-12-31    # XXX: khal 0.13.0 scales linearly, and date
 
 printShortUsage()
 {
-    local commonArguments='[-e|--regexp PATTERN [-e ...]|--tally "WHAT-PATTERN [CONTEXT ...]" [--number-factor N] [--unit UNIT]]'
+    local commonArguments='[-S|--start-times|-E|--end-times [-e ...]|-e|--regexp PATTERN [-e ...]|--tally "WHAT-PATTERN [CONTEXT ...]" [--number-factor N] [--unit UNIT]]'
     local distributionCommonArguments='[--color=(always|auto|never)|--no-color] [--as colorbox-calendar|green-[large-]calendar|...]'
     local distributionOverAutorangeArguments='[--no-footer|--final-footer-only|footer-only-on-change|--footer-every N] [--force-legends] [--bucket-legend [--legend-unit UNIT]] [--over day|month|year|year-weekly|--weekly]'
     local distributionAutolinearArguments='-l|--linear [-w|--width W] [--no-today-base-date|--base-date today|"YYYY MM DD"] [--no-start-date] [--no-end-date] [--days-per-slot N|--slots-per-day N] [--reversed]'
@@ -38,6 +38,10 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
+    --start-times|-S	Graph the distribution of event start times over a day.
+			Events can be filtered via --regexp|-e.
+    --end-times|-E	Graph the distribution of event end times over a day.
+			Events can be filtered via --regexp|-e.
     --regexp|-e PATTERN	Graph the total duration of all events that match
 			PATTERN (a grep-style unanchored basic regular
 			expression).
@@ -72,8 +76,9 @@ typeset -a distributionReversedArg=()
 typeset -a distributionMinArg=(--min 0)
 typeset -a khalArgs=()
 sourceCommand=getDurations
-sourcePreProcessor=
+sourcePreProcessor=handleAllAndMultiDay
 sourcePostProcessor=
+countField=6
 typeset -a grepArgs=()
 tallyWhat=
 tallyContext=
@@ -98,6 +103,9 @@ do
 			distributionBaseDateArg=(); shift;;
 	--reversed)	shift; distributionReversedArg=();;
 
+	--start-times|-S)
+			shift; sourcePreProcessor='getTabField 1'; countField=; distributionArgs+=(--over day --no-splitting);;
+	--end-times|-E)	shift; sourcePreProcessor='getTabField 2'; countField=; distributionArgs+=(--over day --no-splitting);;
 	--regexp|-e)	grepArgs+=("$1" "${2:?}"); shift; shift; sourceCommand=getMatches;;
 	--tally)	shift
 			if [[ "$1" =~ ^([^[:space:]]+)[[:space:]]+(.*)$ ]]; then
@@ -119,6 +127,11 @@ do
     esac
 done
 khalArgs+=("$@")
+
+getTabField()
+{
+    field -F '\t' ${1:?}
+}
 
 getDurations()
 {
@@ -151,7 +164,8 @@ counterbalanceNumberFactorInRecordedNumbers()
 }
 preProcessTally()
 {
-    eval extractTallyNumber \
+    handleAllAndMultiDay \
+	| eval extractTallyNumber \
 	"${tallyNumberFactor:+| counterbalanceNumberFactorInRecordedNumbers}"
 }
 applyNumberFactor()
@@ -189,11 +203,10 @@ $1 "-" $2 "-" $3 != $6 "-" $7 "-" $8 {
 
 printGraph()
 {
-    $distributionCommand --count-field 6 "${distributionBaseDateArg[@]}" "${distributionReversedArg[@]}" "${distributionMinArg[@]}" "${distributionArgs[@]}"
+    $distributionCommand ${countField:+--count-field $countField} "${distributionBaseDateArg[@]}" "${distributionReversedArg[@]}" "${distributionMinArg[@]}" "${distributionArgs[@]}"
 }
 
-$sourceCommand \
-    | eval handleAllAndMultiDay \
+eval '$sourceCommand' \
     "${sourcePreProcessor:+|}$sourcePreProcessor" \
     '| reldate --relative-to-first --difference' \
     "${sourcePostProcessor:+|}$sourcePostProcessor" \
