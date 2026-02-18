@@ -1,0 +1,74 @@
+#!/bin/bash
+
+: ${KHAL_TIMESPAN_MIDNIGHT:=03:00}
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[(-o|--offset N|--month MONTH) [-n|--months M]] [-y|--summary-only|-Y|--no-summary] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Show all events (followed by the total duration) from / run KHAL-COMMAND with
+the range of dates that covers the entire fully passed last [M] month[s] /
+previous N'th month[s] / month MONTH [and M previous].
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --offset|-o N	Use the previous N'th month instead of the last month.
+    --month MONTH	Use MONTH instead of the last month.
+    --months|-n M	Use M previous months instead of a single month only.
+HELPTEXT
+}
+
+offset=0
+count=1
+typeset -a args=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--offset|-o)	shift; offset=${1:?}; shift;;
+	--month)	shift
+			offset=$((10#$(date +%m) - 10#$(date --date "01-${1:?}-$(date +%Y)" +%m) - 1)) || exit 2
+			((offset < 0)) && let offset+=12
+			shift
+			;;
+	--months|-n)	shift; count="${1:?}"; shift;;
+	--)		args+=("$1"); shift; break;;
+	*)		args+=("$1"); shift;;
+    esac
+done
+set -- "${args[@]}" "$@"
+
+calculateDate()
+{
+    local offset=${1:?}; shift
+    local year=$(date +%Y)
+    local month=$((10#$(date +%m) - offset))
+    if ((month <= 0)); then
+	let year+=$((month / 12 - 1))
+	month=$((month % 12 + 12))
+    fi
+    printf "%04d-%02d-01 ${KHAL_TIMESPAN_MIDNIGHT}" $year $month
+}
+
+endDate="$(calculateDate $offset)"
+startDate="$(calculateDate $((offset + count)))"
+
+KHAL_TIMESPAN_OVERALL_PRECISION='--precision h' \
+KHAL_TIMESPAN_QUADRANT_PRECISION='--workday' \
+exec khal-timespan "$@" "$startDate" "$endDate"
