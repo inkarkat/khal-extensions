@@ -62,12 +62,14 @@ getMatchExpr()
 
 : ${KHAL_RANGE_START=1970-01-01}; : ${KHAL_RANGE_END=2099-12-31}; export KHAL_RANGE_START KHAL_RANGE_END
 
-[ "$isSummaryOnly" ] || \
+if [ ! "$isSummaryOnly" ]; then
+    # With NUMBER UNIT: Group by UNIT, sum NUMBERs for all WHAT-PATTERNs together.
     khal-grep --no-color --once --no-summary \
 	--process 'field 1 2 3 4 5 6' \
 	--process 'sumField --group-by -1 --result-first -2' \
 	-e "$(getMatchExpr '')" \
 	"$@"
+fi
 khal-grep --no-color --once --summary-only \
     -e "$(getMatchExpr '\?')" \
     "$@"
