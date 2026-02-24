@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '"WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '"WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -21,6 +21,9 @@ printLongUsage()
 Show all events whose title matches WHAT-PATTERN [NUMBER UNIT] [CONTEXT ...].
 WHAT-PATTERN is a grep-style anchored basic regular expression.
 If there are NUMBER(s), extract all for each UNIT and show their sums.
+For events without NUMBER(s), their durations (in seconds) can be converted into
+UNIT-equivalents via the KHAL_TALLY_what_FACTOR and KHAL_TALLY_what_UNIT
+environment variables, where "what" is replaced by WHAT-PATTERN matches.
 Print a summary of the total duration and date range in which they were
 scheduled.
 HELPDESCRIPTION
@@ -32,6 +35,8 @@ HELPDESCRIPTION
 			date range.
 HELPTEXT
 }
+
+rcFilespec="${XDG_CONFIG_HOME:-${HOME}/.config}/khal/env"; [ ! -f "$rcFilespec" ] || source "$rcFilespec" || exit $?; export "${!KHAL_@}"
 
 isSummaryOnly=
 while [ $# -ne 0 ]
@@ -62,12 +67,30 @@ getMatchExpr()
 
 : ${KHAL_RANGE_START=1970-01-01}; : ${KHAL_RANGE_END=2099-12-31}; export KHAL_RANGE_START KHAL_RANGE_END
 
-[ "$isSummaryOnly" ] || \
+printf -v quotedEnvFactorFunction %q 'envFactor(      factor) {
+    factor = ENVIRON["KHAL_TALLY_" toupper($2) "_FACTOR"]
+    return factor == "" ? 0 : $1 * factor
+}'
+printf -v quotedEnvUnitFunction %q 'envUnit(      unit) {
+    unit = ENVIRON["KHAL_TALLY_" toupper($2) "_UNIT"]
+    return unit == "" ? $2 "-units" : unit
+}'
+
+if [ ! "$isSummaryOnly" ]; then
+    # With NUMBER UNIT: Group by UNIT, sum NUMBERs for all WHAT-PATTERNs together.
     khal-grep --no-color --once --no-summary \
-	--process 'field 1 2 3 4 5 6' \
-	--process 'sumField --group-by -1 --result-first -2' \
+	--process 'sumField --group-by 6 --result-first 5' \
 	-e "$(getMatchExpr '')" \
 	"$@"
+
+    # Without NUMBER UNIT: Group by WHAT-PATTERN, sum durations in seconds, and
+    # convert to UNIT-equivalents.
+    khal-grep --no-color --once --no-summary \
+	--process 'sumField --group-by 4 --result-first 3' \
+	--process "fieldMap --function $quotedEnvFactorFunction --function $quotedEnvUnitFunction --filter 'envFactor()' 1 'envFactor()' 2 'envUnit()'" \
+	-e "$(getMatchExpr '\{0\}')" \
+	"$@"
+fi
 khal-grep --no-color --once --summary-only \
     -e "$(getMatchExpr '\?')" \
     "$@"
