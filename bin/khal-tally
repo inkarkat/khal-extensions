@@ -65,8 +65,7 @@ getMatchExpr()
 if [ ! "$isSummaryOnly" ]; then
     # With NUMBER UNIT: Group by UNIT, sum NUMBERs for all WHAT-PATTERNs together.
     khal-grep --no-color --once --no-summary \
-	--process 'field 1 2 3 4 5 6' \
-	--process 'sumField --group-by -1 --result-first -2' \
+	--process 'sumField --group-by 6 --result-first 5' \
 	-e "$(getMatchExpr '')" \
 	"$@"
 fi
