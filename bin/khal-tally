@@ -36,6 +36,8 @@ HELPDESCRIPTION
 HELPTEXT
 }
 
+rcFilespec="${XDG_CONFIG_HOME:-${HOME}/.config}/khal/env"; [ ! -f "$rcFilespec" ] || source "$rcFilespec" || exit $?; export "${!KHAL_@}"
+
 isSummaryOnly=
 while [ $# -ne 0 ]
 do
