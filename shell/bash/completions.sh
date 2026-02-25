@@ -7,7 +7,7 @@ _khal_complete()
     aliases=("${aliases[@]/#khal-/}")
 
     if [ $COMP_CWORD -ge 3 ] && contains "${COMP_WORDS[1]}-${COMP_WORDS[2]}" "${aliases[@]}"; then
-	local khalAlias="_khal_${COMP_WORDS[1]//-/_}_${COMP_WORDS[2]//-/_}"
+	local khalAlias="_khal_${COMP_WORDS[1]//-/_}_${COMP_WORDS[2]//-/_}_complete"
 	# Completing a sub-alias; delegate to its custom completion function (if
 	# available)
 	if type -t "$khalAlias" >/dev/null; then
@@ -20,7 +20,7 @@ _khal_complete()
 	fi
     fi
     if [ $COMP_CWORD -ge 2 ] && contains "${COMP_WORDS[1]}" "${aliases[@]}"; then
-	local khalAlias="_khal_${COMP_WORDS[1]//-/_}"
+	local khalAlias="_khal_${COMP_WORDS[1]//-/_}_complete"
 	# Completing an alias; delegate to its custom completion function (if
 	# available)
 	if type -t "$khalAlias" >/dev/null; then
@@ -45,4 +45,4 @@ _khal_complete()
 	readarray -O ${#COMPREPLY[@]} -t COMPREPLY < <(compgen -W "${subAliases[*]}" -X "!${2}*")
     fi
 }
-complete -F _khal_complete khal
+complete -F _khal_complete khal khal-wrapper
