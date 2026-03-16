@@ -38,8 +38,10 @@ HELPDESCRIPTION
 			date range.
     --no-summary|-Y	Just output the sum(s) without total effort and date
 			range at the end.
-    --unit UNIT-PATTERN	Just add up WHAT-PATTERN matches for the passed
+    --unit UNIT-PATTERN	Just show WHAT-PATTERN matches where the passed
 			UNIT-PATTERN matches; ignore all other units.
+			Applies to both NUMBER(s) and durations converted to
+			UNIT-equivalents.
 HELPTEXT
 }
 
@@ -52,6 +54,7 @@ isShowSums=t
 isSummary=t
 summaryNumberUnitMulti='\?'
 filterUnit=
+typeset -a filterUnitProcessing=()
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -64,7 +67,7 @@ do
 			isShowSums=; shift;;
 	--no-summary|-Y)
 			isSummary=; shift;;
-	--unit)		shift; filterUnit="${1:?}"; shift; summaryNumberUnitMulti='';;
+	--unit)		shift; filterUnit="${1:?}"; filterUnitProcessing=(--process "grep '[[:space:]]\\(${1}\\)\$'"); shift; summaryNumberUnitMulti='';;
 	--)		shift; break;;
 	*)		break;;
     esac
@@ -106,6 +109,7 @@ if [ "$isShowSums" ]; then
     khal-grep --no-color --once --no-summary \
 	"${nonNumberProcessing[@]}" \
 	--process "fieldMap --function $quotedEnvFactorFunction --function $quotedEnvUnitFunction --filter 'envFactor($tallyFieldNr)' $tallyFieldNr 'envFactor($tallyFieldNr)' $((tallyFieldNr + 1)) 'envUnit($tallyFieldNr)'" \
+	"${filterUnitProcessing[@]}" \
 	-e "$(getMatchExpr '\{0\}')" \
 	"$@"
 fi
