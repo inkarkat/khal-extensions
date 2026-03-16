@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '[-i|--individual-numbers|-y|--summary-only|-Y|--no-summary] [--unit UNIT] "WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '[-i|--individual-numbers|-y|--summary-only|-Y|--no-summary] [--unit UNIT-PATTERN] "WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -38,8 +38,8 @@ HELPDESCRIPTION
 			date range.
     --no-summary|-Y	Just output the sum(s) without total effort and date
 			range at the end.
-    --unit UNIT		Just add up WHAT-PATTERN matches for the passed UNIT;
-			ignore all other units.
+    --unit UNIT-PATTERN	Just add up WHAT-PATTERN matches for the passed
+			UNIT-PATTERN matches; ignore all other units.
 HELPTEXT
 }
 
@@ -80,7 +80,7 @@ fi; shift
 getMatchExpr()
 {
     local numberUnitMulti="${1?}"; shift
-    printf %s "^\\(${what}\\)\\( [[:digit:]]\\+ ${filterUnit:-[[:alpha:]]\\+}\\)${numberUnitMulti}${context}\$"
+    printf %s "^\\(${what}\\)\\( [[:digit:]]\\+ \\(${filterUnit:-[[:alpha:]]\\+}\\)\\)${numberUnitMulti}${context}\$"
 }
 
 : ${KHAL_RANGE_START=1970-01-01}; : ${KHAL_RANGE_END=2099-12-31}; export KHAL_RANGE_START KHAL_RANGE_END
