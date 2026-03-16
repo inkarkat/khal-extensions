@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '[-i|--individual-numbers|-y|--summary-only] "WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '[-i|--individual-numbers|-y|--summary-only|-Y|--no-summary] "WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -36,6 +36,8 @@ HELPDESCRIPTION
 			summing them up.
     --summary-only|-y	Do not output the sum(s); just show the total effort and
 			date range.
+    --no-summary|-Y	Just output the sum(s) without total effort and date
+			range at the end.
 HELPTEXT
 }
 
@@ -44,7 +46,8 @@ rcFilespec="${XDG_CONFIG_HOME:-${HOME}/.config}/khal/env"; [ ! -f "$rcFilespec" 
 tallyFieldNr=1
 typeset -a numberProcessing=(--process 'sumField --group-by 6 --result-first 5')
 typeset -a nonNumberProcessing=(--process 'sumField --group-by 4 --result-first 3')
-isSummaryOnly=
+isShowSums=t
+isSummary=t
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -54,7 +57,9 @@ do
 	--individual-numbers|-i)
 			shift; tallyFieldNr=3; numberProcessing=(--process 'field 1 2 5 6'); nonNumberProcessing=();;
 	--summary-only|-y)
-			isSummaryOnly=t; shift;;
+			isShowSums=; shift;;
+	--no-summary|-Y)
+			isSummary=; shift;;
 	--)		shift; break;;
 	*)		break;;
     esac
@@ -84,7 +89,7 @@ printf -v quotedEnvUnitFunction %q 'envUnit(fieldNr,      unit) {
     return unit == "" ? $(fieldNr + 1) "-units" : unit
 }'
 
-if [ ! "$isSummaryOnly" ]; then
+if [ "$isShowSums" ]; then
     # With NUMBER UNIT: Group by UNIT, sum NUMBERs for all WHAT-PATTERNs together.
     khal-grep --no-color --once --no-summary \
 	"${numberProcessing[@]}" \
@@ -99,6 +104,8 @@ if [ ! "$isSummaryOnly" ]; then
 	-e "$(getMatchExpr '\{0\}')" \
 	"$@"
 fi
-khal-grep --no-color --once --summary-only \
-    -e "$(getMatchExpr '\?')" \
-    "$@"
+if [ "$isSummary" ]; then
+    khal-grep --no-color --once --summary-only \
+	-e "$(getMatchExpr '\?')" \
+	"$@"
+fi
