@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '[-i|--individual-numbers|-y|--summary-only|-Y|--no-summary] "WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '[-i|--individual-numbers|-y|--summary-only|-Y|--no-summary] [--unit UNIT] "WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -38,6 +38,8 @@ HELPDESCRIPTION
 			date range.
     --no-summary|-Y	Just output the sum(s) without total effort and date
 			range at the end.
+    --unit UNIT		Just add up WHAT-PATTERN matches for the passed UNIT;
+			ignore all other units.
 HELPTEXT
 }
 
@@ -48,6 +50,8 @@ typeset -a numberProcessing=(--process 'sumField --group-by 6 --result-first 5')
 typeset -a nonNumberProcessing=(--process 'sumField --group-by 4 --result-first 3')
 isShowSums=t
 isSummary=t
+summaryNumberUnitMulti='\?'
+filterUnit=
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -60,6 +64,7 @@ do
 			isShowSums=; shift;;
 	--no-summary|-Y)
 			isSummary=; shift;;
+	--unit)		shift; filterUnit="${1:?}"; shift; summaryNumberUnitMulti='';;
 	--)		shift; break;;
 	*)		break;;
     esac
@@ -75,7 +80,7 @@ fi; shift
 getMatchExpr()
 {
     local numberUnitMulti="${1?}"; shift
-    printf %s "^\\(${what}\\)\\( [[:digit:]]\\+ [[:alpha:]]\\+\\)${numberUnitMulti}${context}\$"
+    printf %s "^\\(${what}\\)\\( [[:digit:]]\\+ ${filterUnit:-[[:alpha:]]\\+}\\)${numberUnitMulti}${context}\$"
 }
 
 : ${KHAL_RANGE_START=1970-01-01}; : ${KHAL_RANGE_END=2099-12-31}; export KHAL_RANGE_START KHAL_RANGE_END
@@ -106,6 +111,6 @@ if [ "$isShowSums" ]; then
 fi
 if [ "$isSummary" ]; then
     khal-grep --no-color --once --summary-only \
-	-e "$(getMatchExpr '\?')" \
+	-e "$(getMatchExpr "$summaryNumberUnitMulti")" \
 	"$@"
 fi
