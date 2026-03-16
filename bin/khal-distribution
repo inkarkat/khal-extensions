@@ -72,8 +72,8 @@ typeset -a distributionReversedArg=()
 typeset -a distributionMinArg=(--min 0)
 typeset -a khalArgs=()
 sourceCommand=getDurations
-sourcePreProcessor=handleAllAndMultiDay
-sourcePostProcessor='reldate --relative-to-first --difference'
+typeset -a sourcePreProcessor=(handleAllAndMultiDay)
+typeset -a sourcePostProcessor=(reldate --relative-to-first --difference)
 countField=6
 typeset -a grepArgs=()
 typeset -a tallyArgs=()
@@ -97,13 +97,13 @@ do
 	--reversed)	shift; distributionReversedArg=();;
 
 	--start-times|-S)
-			shift; sourcePreProcessor='getTabField 1'; countField=; distributionArgs+=(--over day --no-splitting);;
-	--end-times|-E)	shift; sourcePreProcessor='getTabField 2'; countField=; distributionArgs+=(--over day --no-splitting);;
+			shift; sourcePreProcessor=(getTabField 1); countField=; distributionArgs+=(--over day --no-splitting);;
+	--end-times|-E)	shift; sourcePreProcessor=(getTabField 2); countField=; distributionArgs+=(--over day --no-splitting);;
 	--regexp|-e)	grepArgs+=("$1" "${2:?}"); shift; shift; sourceCommand=getMatches;;
 	--tally)	shift
 			tallyArgs+=("${1:?}"); shift
 			sourceCommand=getTally
-			sourcePostProcessor='field --remove 3 4'	# Drop the end date; this was just needed for handleAllAndMultiDay().
+			sourcePostProcessor=(field --remove 3 4)	# Drop the end date; this was just needed for handleAllAndMultiDay().
 			;;
 	--unit)		tallyArgs=("$1" "${2:?}" "${tallyArgs[@]}"); shift; distributionArgs+=(--legend-unit "$1"); shift;;
 
@@ -166,6 +166,6 @@ printGraph()
 }
 
 eval '$sourceCommand' \
-    "${sourcePreProcessor:+|}$sourcePreProcessor" \
-    "${sourcePostProcessor:+|}$sourcePostProcessor" \
+    "${sourcePreProcessor:+|}" '"${sourcePreProcessor[@]}"' \
+    "${sourcePostProcessor:+|}" '"${sourcePostProcessor[@]}"' \
     | printGraph
