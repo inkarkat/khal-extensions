@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '"WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '[-i|--individual-numbers|-Y|--summary-only] "WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -31,6 +31,9 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
+    --individual-numbers|-i
+			Output individual events with their NUMBERs instead of
+			summing them up.
     --summary-only|-Y	Do not output the sum(s); just show the total effort and
 			date range.
 HELPTEXT
@@ -39,6 +42,8 @@ HELPTEXT
 rcFilespec="${XDG_CONFIG_HOME:-${HOME}/.config}/khal/env"; [ ! -f "$rcFilespec" ] || source "$rcFilespec" || exit $?; export "${!KHAL_@}"
 
 tallyFieldNr=1
+typeset -a numberProcessing=(--process 'sumField --group-by 6 --result-first 5')
+typeset -a nonNumberProcessing=(--process 'sumField --group-by 4 --result-first 3')
 isSummaryOnly=
 while [ $# -ne 0 ]
 do
@@ -46,6 +51,8 @@ do
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--no-color|--color)
 			shift;;	# Ignore color flag; tally doesn't use highlighting.
+	--individual-numbers|-i)
+			shift; tallyFieldNr=3; numberProcessing=(--process 'field 1 2 5 6'); nonNumberProcessing=();;
 	--summary-only|-Y)
 			isSummaryOnly=t; shift;;
 	--)		shift; break;;
@@ -80,14 +87,14 @@ printf -v quotedEnvUnitFunction %q 'envUnit(fieldNr,      unit) {
 if [ ! "$isSummaryOnly" ]; then
     # With NUMBER UNIT: Group by UNIT, sum NUMBERs for all WHAT-PATTERNs together.
     khal-grep --no-color --once --no-summary \
-	--process 'sumField --group-by 6 --result-first 5' \
+	"${numberProcessing[@]}" \
 	-e "$(getMatchExpr '')" \
 	"$@"
 
     # Without NUMBER UNIT: Group by WHAT-PATTERN, sum durations in seconds, and
     # convert to UNIT-equivalents.
     khal-grep --no-color --once --no-summary \
-	--process 'sumField --group-by 4 --result-first 3' \
+	"${nonNumberProcessing[@]}" \
 	--process "fieldMap --function $quotedEnvFactorFunction --function $quotedEnvUnitFunction --filter 'envFactor($tallyFieldNr)' $tallyFieldNr 'envFactor($tallyFieldNr)' $((tallyFieldNr + 1)) 'envUnit($tallyFieldNr)'" \
 	-e "$(getMatchExpr '\{0\}')" \
 	"$@"
