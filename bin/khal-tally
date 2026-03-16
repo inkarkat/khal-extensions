@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '[-i|--individual-numbers|-y|--summary-only|-Y|--no-summary] [--unit UNIT-PATTERN] "WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '[-i|--individual-numbers [--raw-dates]|-y|--summary-only|-Y|--no-summary] [--unit UNIT-PATTERN] "WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -54,6 +54,7 @@ isShowSums=t
 isSummary=t
 summaryNumberUnitMulti='\?'
 filterUnit=
+typeset -a rawDatesArg=()
 typeset -a filterUnitProcessing=()
 while [ $# -ne 0 ]
 do
@@ -68,10 +69,33 @@ do
 	--no-summary|-Y)
 			isSummary=; shift;;
 	--unit)		shift; filterUnit="${1:?}"; filterUnitProcessing=(--process "grep '[[:space:]]\\(${1}\\)\$'"); shift; summaryNumberUnitMulti='';;
+	--raw-dates)	rawDatesArg+=("$1"); shift;;
 	--)		shift; break;;
 	*)		break;;
     esac
 done
+if [ ${#rawDatesArg[@]} -gt 0 ]; then
+    if [ ${#nonNumberProcessing[@]} -gt 0 ]; then
+	echo 'ERROR: --raw-dates can only be used in combination with -i|--individual-numbers.'
+	echo
+	printUsage "$0"
+	exit 2
+    fi
+
+    numberProcessing=(--process 'field 1 2 3 4 6 7')	# Raw end date takes up two fields instead of one for the duration.
+
+    # The non-number processing is complicated, as use of khal-grep --raw-dates
+    # precludes the use of reldate to calculate durations, so we have to do it
+    # ourselves. First, move the WHAT-PATTERN field one to the right, and fill that
+    # position with the calculated start date + duration. The following pipeline
+    # step then removes the duplicate start date and anything after the
+    # WHAT-PATTERN.
+    nonNumberProcessing=(
+	--process "fieldMap 6 '\$5' 5 '\$1 \" \" \$2 \" \" \$3 \" \" \$4|reldate --unbuffered --relative-to-first --difference'"
+	--process "field 1 2 3 4 7 8"
+    )
+    let tallyFieldNr+=2
+fi >&2
 if [[ "$1" =~ ^([^[:space:]]+)[[:space:]]+(.*)$ ]]; then
     what="${BASH_REMATCH[1]}"
     context="${BASH_REMATCH[2]:+ }${BASH_REMATCH[2]}"
@@ -99,14 +123,14 @@ printf -v quotedEnvUnitFunction %q 'envUnit(fieldNr,      unit) {
 
 if [ "$isShowSums" ]; then
     # With NUMBER UNIT: Group by UNIT, sum NUMBERs for all WHAT-PATTERNs together.
-    khal-grep --no-color --once --no-summary \
+    khal-grep --no-color --once --no-summary "${rawDatesArg[@]}" \
 	"${numberProcessing[@]}" \
 	-e "$(getMatchExpr '')" \
 	"$@"
 
     # Without NUMBER UNIT: Group by WHAT-PATTERN, sum durations in seconds, and
     # convert to UNIT-equivalents.
-    khal-grep --no-color --once --no-summary \
+    khal-grep --no-color --once --no-summary "${rawDatesArg[@]}" \
 	"${nonNumberProcessing[@]}" \
 	--process "fieldMap --function $quotedEnvFactorFunction --function $quotedEnvUnitFunction --filter 'envFactor($tallyFieldNr)' $tallyFieldNr 'envFactor($tallyFieldNr)' $((tallyFieldNr + 1)) 'envUnit($tallyFieldNr)'" \
 	"${filterUnitProcessing[@]}" \
