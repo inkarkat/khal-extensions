@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '[-i|--individual-numbers|-Y|--summary-only] "WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '[-i|--individual-numbers|-y|--summary-only] "WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -34,7 +34,7 @@ HELPDESCRIPTION
     --individual-numbers|-i
 			Output individual events with their NUMBERs instead of
 			summing them up.
-    --summary-only|-Y	Do not output the sum(s); just show the total effort and
+    --summary-only|-y	Do not output the sum(s); just show the total effort and
 			date range.
 HELPTEXT
 }
@@ -53,7 +53,7 @@ do
 			shift;;	# Ignore color flag; tally doesn't use highlighting.
 	--individual-numbers|-i)
 			shift; tallyFieldNr=3; numberProcessing=(--process 'field 1 2 5 6'); nonNumberProcessing=();;
-	--summary-only|-Y)
+	--summary-only|-y)
 			isSummaryOnly=t; shift;;
 	--)		shift; break;;
 	*)		break;;
