@@ -14,9 +14,7 @@ printShortUsage()
     local khalArguments='[KHAL-ARGS ...]'
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s %s %s %s %s\n' "$(basename "$1")" "$commonArguments" "$distributionOverAutorangeArguments" "${distributionCommonArguments[@]}" "$khalArguments" '[-?|-h|--help]'
-    echo
-    printf 'Usage: %q %s %s %s %s %s\n' "$(basename "$1")" "$commonArguments" "$distributionAutolinearArguments" "${distributionCommonArguments[@]}" "$khalArguments" '[-?|-h|--help]'
+    printf 'Usage: %q %s ...\n    (\n      %s\n      | %s\n    )\n    %s %s %s\n' "$(basename "$1")" "$commonArguments" "$distributionAutolinearArguments" "$distributionOverAutorangeArguments" "$distributionCommonArguments" "$khalArguments" '[-?|-h|--help]'
 }
 printUsage()
 {
