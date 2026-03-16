@@ -83,7 +83,6 @@ do
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--linear|-l)	shift; distributionCommand=distribution-autolinear; distributionBaseDateArg=(--base-date today); distributionReversedArg=(--reversed);;
 
-	-[S])           distributionArgs+=("$1"); shift;;
 	--@(no-footer|final-footer-only|footer-only-on-change|bucket-legend|no-splitting|weekly|force-legends|no-start-date|no-end-date|no-day-zoom|no-color|color=*))
 			distributionArgs+=("$1"); shift;;
 	-[w])           distributionArgs+=("$1" "$2"); shift; shift;;
