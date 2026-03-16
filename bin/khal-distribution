@@ -7,7 +7,7 @@ readonly ABSOLUTE_END=2099-12-31    # XXX: khal 0.13.0 scales linearly, and date
 
 printShortUsage()
 {
-    local commonArguments='[-S|--start-times|-E|--end-times [-e ...]|-e|--regexp PATTERN [-e ...]|--tally "WHAT-PATTERN [CONTEXT ...]" [--number-factor N] [--unit UNIT]]'
+    local commonArguments='[-S|--start-times|-E|--end-times [-e ...]|-e|--regexp PATTERN [-e ...]|--tally "WHAT-PATTERN [CONTEXT ...]" [--unit UNIT-PATTERN]]'
     local distributionCommonArguments='[--color=(always|auto|never)|--no-color] [--as colorbox-calendar|green-[large-]calendar|...]'
     local distributionOverAutorangeArguments='[--no-footer|--final-footer-only|footer-only-on-change|--footer-every N] [--force-legends] [--bucket-legend [--legend-unit UNIT]] [--over day|month|year|year-weekly|--weekly]'
     local distributionAutolinearArguments='-l|--linear [-w|--width W] [--no-today-base-date|--base-date today|"YYYY MM DD"] [--no-start-date] [--no-end-date] [--days-per-slot N|--slots-per-day N] [--reversed]'
@@ -52,12 +52,10 @@ HELPDESCRIPTION
 			expression. If there are NUMBER(s), add up all
 			regardless of their UNIT(s); without NUMBER, use the
 			event's duration (like with --regexp).
-    --number-factor N	Multiply each duration (of events without a NUMBER;
-			counted in hours) with N to make the durations
-			comparable to the NUMBERs. In other words, a factor of N
-			makes an one-hour event equivalent to a number of N.
-    --unit UNIT		Just add up WHAT-PATTERN matches for the passed UNIT;
-			ignore all other units or matches without NUMBER.
+    --unit UNIT-PATTERN	Just add up WHAT-PATTERN matches where the passed
+			UNIT-PATTERN matches; ignore all other units.
+			Applies to both NUMBER(s) and durations converted to
+			UNIT-equivalents.
     --linear|-l		Choose a linear representation in one line with
 			auto-scaling of the time instead of the fixed reporting
 			over day, month, years.
@@ -77,13 +75,10 @@ typeset -a distributionMinArg=(--min 0)
 typeset -a khalArgs=()
 sourceCommand=getDurations
 sourcePreProcessor=handleAllAndMultiDay
-sourcePostProcessor=
+sourcePostProcessor='reldate --relative-to-first --difference'
 countField=6
 typeset -a grepArgs=()
-tallyWhat=
-tallyContext=
-tallyNumberFactor=
-tallyUnit=
+typeset -a tallyArgs=()
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -108,19 +103,11 @@ do
 	--end-times|-E)	shift; sourcePreProcessor='getTabField 2'; countField=; distributionArgs+=(--over day --no-splitting);;
 	--regexp|-e)	grepArgs+=("$1" "${2:?}"); shift; shift; sourceCommand=getMatches;;
 	--tally)	shift
-			if [[ "$1" =~ ^([^[:space:]]+)[[:space:]]+(.*)$ ]]; then
-			    tallyWhat="${BASH_REMATCH[1]}"
-			    tallyContext="${BASH_REMATCH[2]:+ }${BASH_REMATCH[2]}"
-			else
-			    tallyWhat="${1:?}"
-			    tallyContext='\([[:space:]].*\)\?'
-			fi; shift
+			tallyArgs+=("${1:?}"); shift
 			sourceCommand=getTally
-			sourcePreProcessor=preProcessTally
+			sourcePostProcessor='field --remove 3 4'	# Drop the end date; this was just needed for handleAllAndMultiDay().
 			;;
-	--number-factor)
-			shift; tallyNumberFactor=$((3600 / ${1:?})); shift; sourcePostProcessor=applyNumberFactor;;
-	--unit)		shift; tallyUnit="${1:?}"; distributionArgs+=(--legend-unit "$1"); shift;;
+	--unit)		tallyArgs=("$1" "${2:?}" "${tallyArgs[@]}"); shift; distributionArgs+=(--legend-unit "$1"); shift;;
 
 	--)		khalArgs+=("$1"); shift; break;;
 	*)		khalArgs+=("$1"); shift;;
@@ -145,33 +132,7 @@ getMatches()
 
 getTally()
 {
-    [ -n "$tallyUnit" ] \
-	&& local matchExpr="^\\(${tallyWhat}\\)\\( [[:digit:]]\\+ ${tallyUnit}\\)${tallyContext}\$" \
-	|| local matchExpr="^\\(${tallyWhat}\\)\\( [[:digit:]]\\+ [[:alpha:]]\\+\\)\\?${tallyContext}\$"
-    khal-grep --no-color --once --no-summary --raw-dates -e "$matchExpr"
-}
-extractTallyNumber()
-{
-    sed \
-	-e "s#\\t[[:digit:] :-]\\+\\t\\(${tallyWhat}\\) \\([[:digit:]]\\+\\) [[:alpha:]]\\+.*\$#\\t\\2#" \
-	-e t \
-	-e "s#\\t\\(${tallyWhat}\\).*\$##"
-}
-counterbalanceNumberFactorInRecordedNumbers()
-{
-    fieldMap -F '\t' -v numberFactor="$tallyNumberFactor" \
-	    2 '$fieldNr ~ /^[[:digit:]]+$/ ? $fieldNr * numberFactor : $fieldNr'
-}
-preProcessTally()
-{
-    handleAllAndMultiDay \
-	| eval extractTallyNumber \
-	"${tallyNumberFactor:+| counterbalanceNumberFactorInRecordedNumbers}"
-}
-applyNumberFactor()
-{
-    fieldMap -F '\t' -v numberFactor="$tallyNumberFactor" \
-	    2 'int($fieldNr / numberFactor)'
+    khal-tally --individual-numbers --no-summary --raw-dates "${tallyArgs[@]}"
 }
 
 
@@ -208,6 +169,5 @@ printGraph()
 
 eval '$sourceCommand' \
     "${sourcePreProcessor:+|}$sourcePreProcessor" \
-    '| reldate --relative-to-first --difference' \
     "${sourcePostProcessor:+|}$sourcePostProcessor" \
     | printGraph
