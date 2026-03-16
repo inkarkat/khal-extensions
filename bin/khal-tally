@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '"WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '[-i|--individual-numbers|-y|--summary-only|-Y|--no-summary] "WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -31,22 +31,35 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
-    --summary-only|-Y	Do not output the sum(s); just show the total effort and
+    --individual-numbers|-i
+			Output individual events with their NUMBERs instead of
+			summing them up.
+    --summary-only|-y	Do not output the sum(s); just show the total effort and
 			date range.
+    --no-summary|-Y	Just output the sum(s) without total effort and date
+			range at the end.
 HELPTEXT
 }
 
 rcFilespec="${XDG_CONFIG_HOME:-${HOME}/.config}/khal/env"; [ ! -f "$rcFilespec" ] || source "$rcFilespec" || exit $?; export "${!KHAL_@}"
 
-isSummaryOnly=
+tallyFieldNr=1
+typeset -a numberProcessing=(--process 'sumField --group-by 6 --result-first 5')
+typeset -a nonNumberProcessing=(--process 'sumField --group-by 4 --result-first 3')
+isShowSums=t
+isSummary=t
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--no-color|--color)
 			shift;;	# Ignore color flag; tally doesn't use highlighting.
-	--summary-only|-Y)
-			isSummaryOnly=t; shift;;
+	--individual-numbers|-i)
+			shift; tallyFieldNr=3; numberProcessing=(--process 'field 1 2 5 6'); nonNumberProcessing=();;
+	--summary-only|-y)
+			isShowSums=; shift;;
+	--no-summary|-Y)
+			isSummary=; shift;;
 	--)		shift; break;;
 	*)		break;;
     esac
@@ -67,30 +80,32 @@ getMatchExpr()
 
 : ${KHAL_RANGE_START=1970-01-01}; : ${KHAL_RANGE_END=2099-12-31}; export KHAL_RANGE_START KHAL_RANGE_END
 
-printf -v quotedEnvFactorFunction %q 'envFactor(      factor) {
-    factor = ENVIRON["KHAL_TALLY_" toupper($2) "_FACTOR"]
-    return factor == "" ? 0 : $1 * factor
+printf -v quotedEnvFactorFunction %q 'envFactor(fieldNr,      factor) {
+    factor = ENVIRON["KHAL_TALLY_" toupper($(fieldNr + 1)) "_FACTOR"]
+    return factor == "" ? 0 : $fieldNr * factor
 }'
-printf -v quotedEnvUnitFunction %q 'envUnit(      unit) {
-    unit = ENVIRON["KHAL_TALLY_" toupper($2) "_UNIT"]
-    return unit == "" ? $2 "-units" : unit
+printf -v quotedEnvUnitFunction %q 'envUnit(fieldNr,      unit) {
+    unit = ENVIRON["KHAL_TALLY_" toupper($(fieldNr + 1)) "_UNIT"]
+    return unit == "" ? $(fieldNr + 1) "-units" : unit
 }'
 
-if [ ! "$isSummaryOnly" ]; then
+if [ "$isShowSums" ]; then
     # With NUMBER UNIT: Group by UNIT, sum NUMBERs for all WHAT-PATTERNs together.
     khal-grep --no-color --once --no-summary \
-	--process 'sumField --group-by 6 --result-first 5' \
+	"${numberProcessing[@]}" \
 	-e "$(getMatchExpr '')" \
 	"$@"
 
     # Without NUMBER UNIT: Group by WHAT-PATTERN, sum durations in seconds, and
     # convert to UNIT-equivalents.
     khal-grep --no-color --once --no-summary \
-	--process 'sumField --group-by 4 --result-first 3' \
-	--process "fieldMap --function $quotedEnvFactorFunction --function $quotedEnvUnitFunction --filter 'envFactor()' 1 'envFactor()' 2 'envUnit()'" \
+	"${nonNumberProcessing[@]}" \
+	--process "fieldMap --function $quotedEnvFactorFunction --function $quotedEnvUnitFunction --filter 'envFactor($tallyFieldNr)' $tallyFieldNr 'envFactor($tallyFieldNr)' $((tallyFieldNr + 1)) 'envUnit($tallyFieldNr)'" \
 	-e "$(getMatchExpr '\{0\}')" \
 	"$@"
 fi
-khal-grep --no-color --once --summary-only \
-    -e "$(getMatchExpr '\?')" \
-    "$@"
+if [ "$isSummary" ]; then
+    khal-grep --no-color --once --summary-only \
+	-e "$(getMatchExpr '\?')" \
+	"$@"
+fi
