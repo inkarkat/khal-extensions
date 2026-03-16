@@ -12,7 +12,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: [KHAL_GREP_DATERANGE=TIMESPAN] %q %s\n' "$(basename "$1")" '[--raw-dates] [-y|--summary-only|-Y|--no-summary] [--process PROCESSING-COMMAND [--process ...]] [KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
+    printf 'Usage: [KHAL_GREP_DATERANGE=TIMESPAN] %q %s\n' "$(basename "$1")" '[--raw-dates] [-y|--summary-only|-Y|--no-summary] [--process PROCESSING-COMMAND|"" [--process ...]] [KHAL-ARGS ...] [GREP-ARGS ...] PATTERN [-?|-h|--help]'
 }
 printUsage()
 {
@@ -42,6 +42,8 @@ HELPDESCRIPTION
 			and date range at the end.
     --process PROCESSING-COMMAND
 			Transform the result via PROCESSING-COMMAND.
+    --process ""	Disable the default processing of the duration into
+			human-readable units and output plain integer seconds.
 HELPTEXT
 }
 
