@@ -1,0 +1,65 @@
+#!/bin/bash
+set -o pipefail
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, they can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--unit UNIT-PATTERN] "WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Extract NUMBERs from all events whose title matches WHAT-PATTERN [NUMBER UNIT]
+[CONTEXT ...] and plot them over time.
+WHAT-PATTERN is a grep-style anchored basic regular expression.
+If there are NUMBER(s), extract all (for each / passed UNIT) and plot them.
+For events without NUMBER(s), their durations (in seconds) can be converted into
+UNIT-equivalents via the KHAL_TALLY_what_FACTOR and KHAL_TALLY_what_UNIT
+environment variables, where "what" is replaced by WHAT-PATTERN matches.
+Custom gnuplotTimeSeries / Gnuplot commands can be set per WHAT-pattern via
+KHAL_PLOT_what_GNUPLOTTIMESERIES_ARGS / KHAL_PLOT_what_COMMAND environment
+variables.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+SEE ALSO:
+- khal-tally is used to extract the data.
+HELPTEXT
+}
+
+rcFilespec="${XDG_CONFIG_HOME:-${HOME}/.config}/khal/env"; [ ! -f "$rcFilespec" ] || source "$rcFilespec" || exit $?; export "${!KHAL_@}"
+
+case "$1" in
+    --help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+esac
+
+typeset -a gnuplotCommands=()
+while IFS=$'\n' read -r what
+do
+    argsVarName="KHAL_PLOT_${what^^}_GNUPLOTTIMESERIES_ARGS"
+    [ -n "${!argsVarName}" ] \
+	&& eval "gnuplotCommands+=(${!argsVarName})"
+
+    commandVarName="KHAL_PLOT_${what^^}_COMMAND"
+    [ -n "${!commandVarName}" ] \
+	&& gnuplotCommands+=(--command "${!commandVarName}")
+done < <(khal-tally --print-whats "$@")
+
+khal-tally --individual-numbers --no-summary "$@" \
+    | gnuplotTimeSeries --second 0 --graph-field 7 \
+	    -c 'set boxwidth 86400 absolute' \
+	    -c 'set style fill solid' \
+	    "${gnuplotCommands[@]}" \
+	    --with 'boxes palette' 6:6
