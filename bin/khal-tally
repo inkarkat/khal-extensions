@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '[-i|--individual-numbers [--raw-dates]|-y|--summary-only|-Y|--no-summary] [--unit UNIT-PATTERN] "WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: [KHAL_TALLY_what_FACTOR=N [KHAL_TALLY_what_UNIT=UNIT] ...] %q %s\n' "$(basename "$1")" '[-i|--individual-numbers [--raw-dates]|-y|--summary-only|-Y|--no-summary|--print-whats] [--unit UNIT-PATTERN] "WHAT-PATTERN [CONTEXT ...]" [KHAL-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -52,6 +52,7 @@ typeset -a numberProcessing=(--process 'sumField --group-by 6 --result-first 5')
 typeset -a nonNumberProcessing=(--process 'sumField --group-by 4 --result-first 3')
 isShowSums=t
 isSummary=t
+isPrintWhats=
 summaryNumberUnitMulti='\?'
 filterUnit=
 typeset -a rawDatesArg=()
@@ -65,9 +66,10 @@ do
 	--individual-numbers|-i)
 			shift; tallyFieldNr=3; numberProcessing=(--process 'field 1 2 5 6'); nonNumberProcessing=();;
 	--summary-only|-y)
-			isShowSums=; shift;;
+			shift; isShowSums=;;
 	--no-summary|-Y)
-			isSummary=; shift;;
+			shift; isSummary=;;
+	--print-whats)	shift; isPrintWhats=t; isShowSums=; isSummary=;;
 	--unit)		shift; filterUnit="${1:?}"; filterUnitProcessing=(--process "grep '[[:space:]]\\(${1}\\)\$'"); shift; summaryNumberUnitMulti='';;
 	--raw-dates)	rawDatesArg+=("$1"); shift;;
 	--)		shift; break;;
@@ -135,6 +137,13 @@ if [ "$isShowSums" ]; then
 	--process "fieldMap --function $quotedEnvFactorFunction --function $quotedEnvUnitFunction --filter 'envFactor($tallyFieldNr)' $tallyFieldNr 'envFactor($tallyFieldNr)' $((tallyFieldNr + 1)) 'envUnit($tallyFieldNr)'" \
 	"${filterUnitProcessing[@]}" \
 	-e "$(getMatchExpr '\{0\}')" \
+	"$@"
+fi
+if [ "$isPrintWhats" ]; then
+    khal-grep --no-color --once --no-summary \
+	--process 'field 4' \
+	--process 'sort --unique' \
+	-e "$(getMatchExpr "$summaryNumberUnitMulti")" \
 	"$@"
 fi
 if [ "$isSummary" ]; then
