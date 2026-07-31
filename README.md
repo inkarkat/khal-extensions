@@ -4,6 +4,11 @@ _Additions and tweaks to the khal CLI._
 
 These are some personal aliases, shortcuts, and extensions that make (my) work with the [khal](https://lostpackets.de/khal/) / [vdirsyncer](https://github.com/pimutils/vdirsyncer) command-line utilities easier and faster. Some of them may be specific to my environment and workflow, but maybe someone finds a valuable nugget in there.
 
+### Dependencies
+
+* Bash
+* [inkarkat/shell-debugging](https://github.com/inkarkat/shell-debugging) for debugging (optional)
+
 ### Installation
 
 Download all / some selected extensions (note that some have dependencies, though) and put them somewhere in your `PATH`. You can then invoke them via `khal-SUBCOMMAND`.

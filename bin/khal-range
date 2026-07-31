@@ -132,7 +132,7 @@ if [ "$isInverted" ]; then
     # the first (preceding) inverted range. For the end date, no such arithmetics is
     # necessary.
     type -t -- dateex >/dev/null && start="$(dateex --date "$start -1m" '+%F %R')"
-    case ",${DEBUG:-}," in *,khal-range,*) printf >&2 '%skhal-range: %q / %q / %q / %q\n' "$PS4" "$SEARCH_START" "$start" "$end" "$SEARCH_END";; esac
+    ${DEBUG:+debuglogf '%q / %q / %q / %q' "$SEARCH_START" "$start" "$end" "$SEARCH_END"}
 
     doRange "$SEARCH_START" "$start" "$@" | outputOrError --multiline --status 99; status=$?
 
@@ -146,6 +146,6 @@ if [ "$isInverted" ]; then
 	"${paddingCommand:+|}" '"${paddingCommand[@]}"' \
 	|| exit $status
 else
-    case ",${DEBUG:-}," in *,khal-range,*) printf >&2 '%skhal-range: %q / %q\n' "$PS4" "$start" "$end";; esac
+    ${DEBUG:+debuglogf '%q / %q' "$start" "$end"}
     doRange "$start" "$end" "$@"
 fi
