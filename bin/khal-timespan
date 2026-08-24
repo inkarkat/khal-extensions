@@ -48,11 +48,11 @@ end="${!#}"
 start="${*:(-2):1}"
 set -- "${@:1:$(($#-2))}"
 
-khalAlias="khal-$1"
-if type -t "$khalAlias" >/dev/null; then
+khalExtension="khal-$1"
+if type -t "$khalExtension" >/dev/null; then
     shift
     export KHAL_RANGE_START="$start" KHAL_RANGE_END="$end"
-    exec "$khalAlias" "${colorArg[@]}" "$@"
+    exec "$khalExtension" "${colorArg[@]}" "$@"
 fi
 
 isShowEvents=t

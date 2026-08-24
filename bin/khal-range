@@ -104,11 +104,11 @@ doRange()
     local start="${1:?}"; shift
     local end="${1:?}"; shift
 
-    local khalAlias="khal-$1"
-    if type -t "$khalAlias" >/dev/null; then
+    local khalExtension="khal-$1"
+    if type -t "$khalExtension" >/dev/null; then
 	shift
 	export KHAL_RANGE_START="$start" KHAL_RANGE_END="$end"
-	"$khalAlias" "${colorArg[@]}" "${khalArgs[@]}" "$@"
+	"$khalExtension" "${colorArg[@]}" "${khalArgs[@]}" "$@"
     else
 	khal-timespan "${colorArg[@]}" "${khalArgs[@]}" "$@" "$start" "$end"
     fi

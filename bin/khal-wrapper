@@ -4,7 +4,7 @@ shopt -qs extglob
 
 : ${KHAL_DEFAULT_COMMAND=td}
 
-# Allow definition of khal aliases by putting an executable "khal-foo"
+# Allow definition of khal extensions by putting an executable "khal-foo"
 # somewhere in the PATH. Add paging when outputting to the terminal, as khal
 # output can be long, and the command (nor my extensions) doesn't do that on its
 # own.
@@ -81,18 +81,18 @@ pagerDisableCheck()
     done
 }
 
-typeset khalSubAlias="khal-$1-$2"
-typeset khalAlias="khal-$1"
+typeset khalSubExtension="khal-$1-$2"
+typeset khalExtension="khal-$1"
 if [ $# -eq 0 -a -n "$KHAL_DEFAULT_COMMAND" ]; then
     eval "exec \"\${BASH_SOURCE[0]}\" $KHAL_DEFAULT_COMMAND \"\${khalSubCommandArgs[@]}\""
-elif type -t "$khalSubAlias" >/dev/null; then
+elif type -t "$khalSubExtension" >/dev/null; then
     pagerDisableCheck "$1-$2" "$@"
 
-    shift; shift; eval $khalSubAlias '"${colorArg[@]}" "${khalMainArgs[@]}" "${khalSubCommandArgs[@]}" "$@"' "${pager:+|}" '"${pager[@]}"'
-elif type -t "$khalAlias" >/dev/null; then
+    shift; shift; eval $khalSubExtension '"${colorArg[@]}" "${khalMainArgs[@]}" "${khalSubCommandArgs[@]}" "$@"' "${pager:+|}" '"${pager[@]}"'
+elif type -t "$khalExtension" >/dev/null; then
     pagerDisableCheck "$@"
 
-    shift; eval $khalAlias '"${colorArg[@]}" "${khalMainArgs[@]}" "${khalSubCommandArgs[@]}" "$@"' "${pager:+|}" '"${pager[@]}"'
+    shift; eval $khalExtension '"${colorArg[@]}" "${khalMainArgs[@]}" "${khalSubCommandArgs[@]}" "$@"' "${pager:+|}" '"${pager[@]}"'
 else
     pagerDisableCheck "$@"
 
