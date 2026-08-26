@@ -45,7 +45,7 @@ case "$1" in
     --help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 esac
 
-typeset -a gnuplotCommands=()
+typeset -a gnuplotCommands=(--split-graph-field 1)
 while IFS=$'\n' read -r what
 do
     argsVarName="KHAL_PLOT_${what^^}_GNUPLOTTIMESERIES_ARGS"
