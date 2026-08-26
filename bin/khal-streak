@@ -1,0 +1,178 @@
+#!/bin/bash
+set -o pipefail
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, they can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-e|--regexp PATTERN [-e ...]] [--count N] [--earliest|--longest|--shortest] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Show all events from / run KHAL-COMMAND with a range of dates determined by the
+events [whose title matches PATTERN] which have occurred on each consecutive
+day.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --regexp|-e PATTERN	Only consider events that whose title matches PATTERN.
+    --count N		Use the N'th streak instead of the most recent one.
+    --earliest		Use / start counting from the earliest encountered
+			streak instead of the latest.
+    --longest		Use / start counting from the longest streak.
+    --shortest		Use / start counting from the shortest streak.
+HELPTEXT
+}
+
+typeset -a sedArgs=()
+addPattern()
+{
+    sedArgs+=(-e "/${1//^/$'\t\a\f'}/s/\t\a\f.*\$//p")
+}
+typeset -a colorArg=()
+count=1
+typeset -a args=()
+typeset -a khalArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--no-color|--color)
+			colorArg=("$1"); shift;;
+	--regexp|-e)	shift; addPattern "${1:?}"; shift;;
+	--regexp=*)	addPattern "${1#--regexp=}"; shift;;
+	--count)	shift; count="${1:?}"; shift;;
+
+	-[ad])		khalArgs+=("$1" "${2?}"); shift; shift;;
+	--)		args+=("$1"); shift; break;;
+	*)		args+=("$1"); shift;;
+    esac
+done
+set -- "${args[@]}" "$@"
+
+listEvents()
+{
+    KHAL_MEMOIZE=t khal-wrapper --no-color list --once "${khalArgs[@]}" \
+	    --day-format '' --format $'{start-date-long} {start-time-full}\t{end-date-long} {end-time-full}\t\a\f{title}' \
+	    "$SEARCH_START" "$SEARCH_END"
+}
+
+findMatchingEvents()
+{
+    eval listEvents \
+	"${sedArgs:+|}" 'sed -n "${sedArgs[@]}"'
+}
+
+handleAllAndMultiDay()
+{
+    # All-day events cover the entire day.
+    # Multi-day events should cover all days; typically these are all-day events,
+    # but the implementation also handles normal ranges that just cross a day
+    # border.
+    awk -F '[[:space:]:-]' '
+$1 "-" $2 "-" $3 != $6 "-" $7 "-" $8 {
+    print $1 "-" $2 "-" $3 " " $4 ":" $5 "\t" $1 "-" $2 "-" $3 " 23:59"
+
+    endEpoch = mktime($6 " " $7 " " $8 " 00 00 00", 1)
+    for (epoch = mktime($1 " " $2 " " $3 " 00 00 00", 1) + 86400; epoch < endEpoch; epoch += 86400) {
+	print strftime("%Y-%m-%d 00:00\t%Y-%m-%d 23:59", epoch, 1)
+    }
+    print $6 "-" $7 "-" $8 " 00:00\t" $6 "-" $7 "-" $8 " " ($9 == 0 && $10 == 0 ? "23:59" : $9 ":" $10)
+
+    next
+}
+$1 "-" $2 "-" $3 == $6 "-" $7 "-" $8  && $4 == 0 && $5 == 0 && $9 == 0 && $10 == 0 {
+    print $1 "-" $2 "-" $3 " 00:00\t" $1 "-" $2 "-" $3 " 23:59"
+    next
+}
+{ print; }
+'
+}
+
+calculateStreaks()
+{
+    awk -F '[[:space:]:-]' -v changeFormat='%Y %m %d 0 0 0' -v gapSeconds=86400 '
+function calculateGap(startEpoch, endEpoch,      startChangeTime, endChangeTime, timeGapSeconds) {
+    startChangeTime = strftime(changeFormat, startEpoch, 1)
+    endChangeTime = strftime(changeFormat, endEpoch, 1)
+    timeGapSeconds = mktime(endChangeTime, 1) - mktime(startChangeTime, 1)
+    return (timeGapSeconds > 0 ? int(timeGapSeconds / gapSeconds + 0.5) : 0)
+}
+function checkGap(startEpoch, startTime,endEpoch,      currentGap) {
+    currentGap = calculateGap(startEpoch, endEpoch)
+    # print "****currentGap=" currentGap > "/dev/stderr"
+    if (currentGap > 1) {
+	if (previousStartTime != "") {
+	    streakGap = calculateGap(previousStartEpoch, streakEndEpoch)
+	    printf("%d\t%s\t%s\n", streakGap, previousStartTime, streakEndTime)
+	}
+	streakEndEpoch = startEpoch
+	streakEndTime = startTime
+	# print "****streakEndTime=" streakEndTime > "/dev/stderr"
+    }
+}
+BEGIN {
+    previousStartEpoch = 2^PREC
+}
+{
+    startTime = $1 "-" $2 "-" $3 " " $4 ":" $5
+    endTime = $6 "-" $7 "-" $8 " " $9 ":" $10
+    endEpoch = mktime($6 " " $7 " " $8 " " $9 " " $10 " 00", 1)
+
+    checkGap(endEpoch, endTime, previousStartEpoch)
+
+    previousStartEpoch = mktime($1 " " $2 " " $3 " " $4 " " $5 " 0", 1)
+    previousStartTime = startTime
+    # print "**** previousStartEpoch=" previousStartEpoch ", previousStartTime=" previousStartTime > "/dev/stderr"
+}
+END {
+    checkGap(0, "", previousStartEpoch)
+}
+'
+}
+
+doRange()
+{
+    local start="${1:?}"; shift
+    local end="${1:?}"; shift
+
+    local khalExtension="khal-$1"
+    if type -t "$khalExtension" >/dev/null; then
+	shift
+	export KHAL_RANGE_START="$start" KHAL_RANGE_END="$end"
+	"$khalExtension" "${colorArg[@]}" "${khalArgs[@]}" "$@"
+    else
+	khal-timespan "${colorArg[@]}" "${khalArgs[@]}" "$@" "$start" "$end"
+    fi
+}
+
+readonly ABSOLUTE_START='1970-01-01 00:00'
+readonly ABSOLUTE_END='2099-12-31 23:59'    # XXX: khal 0.13.0 scales linearly, and dates beyond the year 2999 cannot be parsed
+readonly SEARCH_START="${KHAL_RANGE_START:-$ABSOLUTE_START}"
+readonly SEARCH_END="${KHAL_RANGE_END:-$ABSOLUTE_END}"
+unset KHAL_RANGE_START KHAL_RANGE_END
+
+
+findMatchingEvents \
+    | handleAllAndMultiDay \
+    | sort --numeric-sort --reverse \
+    | calculateStreaks
+
+exit
+# start="${start/% / 00:00}"  # Add time to all-day event.
+# end="${end/% / 23:59}"	# Add time to all-day event.
+
+${DEBUG:+debuglogf '%q / %q' "$start" "$end"}
+doRange "$start" "$end" "$@"
