@@ -18,6 +18,14 @@ do
     esac
 done
 set -- "${khalListArgs[@]}" "$@"
+if [ -n "$KHAL_RANGE_START" ]; then
+    set -- "$@" "$KHAL_RANGE_START"
+    unset KHAL_RANGE_START
+fi
+if [ -n "$KHAL_RANGE_END" ]; then
+    set -- "$@" "$KHAL_RANGE_END"
+    unset KHAL_RANGE_END
+fi
 
 typeset -a memoizer=()
 if [ "$KHAL_MEMOIZE" ]; then
