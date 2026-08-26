@@ -180,7 +180,13 @@ removeTitleMarker()
     sed 's/\a\f//'
 }
 
-khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format "{start-date-long} {start-time${isFullTime:+-full}}"$'\t'"{end-date-long} {end-time${isFullTime:+-full}}"$'\t\a\f{title}' "${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?} ago" '+%F %R')}" "${KHAL_RANGE_END:-$(date --date "${KHAL_GREP_DATERANGE:?}" '+%F %R')}" \
+rangeStart="${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?} ago" '+%F %R')}"
+rangeEnd="${KHAL_RANGE_END:-$(date --date "${KHAL_GREP_DATERANGE:?}" '+%F %R')}"
+unset KHAL_RANGE_START KHAL_RANGE_END
+
+KHAL_MEMOIZE=t khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" \
+	--day-format '' --format "{start-date-long} {start-time${isFullTime:+-full}}"$'\t'"{end-date-long} {end-time${isFullTime:+-full}}"$'\t\a\f{title}' \
+	"$rangeStart" "$rangeEnd" \
     | grep "${grepArgs[@]}" "$@" \
     | eval removeTitleMarker \
     "${reldateCommand:+|}" '"${reldateCommand[@]}"' \

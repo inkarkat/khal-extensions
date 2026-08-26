@@ -119,7 +119,9 @@ getTabField()
 
 getDurations()
 {
-    khal-wrapper list --no-color --once --day-format '' --format $'{start-date-long} {start-time-full}\t{end-date-long} {end-time-full}' "${khalArgs[@]}" "${KHAL_RANGE_START:-$(date --date "${KHAL_DISTRIBUTION_DATERANGE:?}" +%F)}" "${KHAL_RANGE_END:-$ABSOLUTE_END}"
+    KHAL_MEMOIZE=t khal-wrapper --no-color list --once "${khalArgs[@]}" \
+	    --day-format '' --format $'{start-date-long} {start-time-full}\t{end-date-long} {end-time-full}' \
+	    "${KHAL_RANGE_START:-$(date --date "${KHAL_DISTRIBUTION_DATERANGE:?}" +%F)}" "${KHAL_RANGE_END:-$ABSOLUTE_END}"
 }
 
 getMatches()

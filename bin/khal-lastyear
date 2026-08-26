@@ -60,4 +60,5 @@ startYear=$((endYear - count))
 
 KHAL_TIMESPAN_OVERALL_PRECISION='--precision h' \
 KHAL_TIMESPAN_QUADRANT_PRECISION='--workday' \
+KHAL_RANGE_MEMOIZATION_DURATION='1d' \
 exec khal-timespan "$@" "${startYear}-${KHAL_LASTYEAR_START_MONTH}-01 00:00" "${endYear}-${KHAL_LASTYEAR_START_MONTH}-01 00:00"

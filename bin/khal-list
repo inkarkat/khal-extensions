@@ -1,0 +1,42 @@
+#!/bin/bash
+shopt -qs extglob
+
+: ${KHAL_DEFAULT_MEMOIZATION_DURATION=10m}
+
+typeset -a khalListArgs=()
+typeset -a khalMainArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	-[vlc])		khalMainArgs+=("$1" "${2?}"); shift; shift;;
+	--@(color|no-color))
+			khalMainArgs+=("$1"); shift;;
+	--@(verbosity|logfile|config))
+			khalMainArgs+=("$1" "${2?}"); shift; shift;;
+	--)		khalListArgs+=("$1"); shift; break;;
+	*)		khalListArgs+=("$1"); shift;;
+    esac
+done
+set -- "${khalListArgs[@]}" "$@"
+if [ -n "$KHAL_RANGE_START" ]; then
+    set -- "$@" "$KHAL_RANGE_START"
+    unset KHAL_RANGE_START
+fi
+if [ -n "$KHAL_RANGE_END" ]; then
+    set -- "$@" "$KHAL_RANGE_END"
+    unset KHAL_RANGE_END
+fi
+
+typeset -a memoizer=()
+if [ "$KHAL_MEMOIZE" ]; then
+    memoizationDuration="${KHAL_RANGE_MEMOIZATION_DURATION:-$KHAL_DEFAULT_MEMOIZATION_DURATION}"
+    if [ -n "$memoizationDuration" ]; then
+	# For clients that set KHAL_MEMOIZE, two trailing DATETIME DATETIME|RANGE
+	# arguments are mandatory.
+	rangeStart="${*:(-2):1}"
+	rangeEnd="${!#}"
+	memoizer=(memoizeCall --memoize-group khal --context "$rangeStart" --context "$rangeEnd" --successful-only --for "$memoizationDuration")
+    fi
+fi
+
+exec "${memoizer[@]}" khal "${khalMainArgs[@]}" list "$@"
