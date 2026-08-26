@@ -2,6 +2,7 @@
 set -o pipefail
 shopt -qs extglob
 
+: ${KHAL_DEFAULT_MEMOIZATION_DURATION=10m}
 : ${KHAL_GREP_COMMAND_JOINER=|}
 : ${KHAL_GREP_DATERANGE:=3 months}
 : ${ENGINEERINGDAY_SECONDS:=$((6 * 3600))}
@@ -180,7 +181,13 @@ removeTitleMarker()
     sed 's/\a\f//'
 }
 
-khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format "{start-date-long} {start-time${isFullTime:+-full}}"$'\t'"{end-date-long} {end-time${isFullTime:+-full}}"$'\t\a\f{title}' "${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?} ago" '+%F %R')}" "${KHAL_RANGE_END:-$(date --date "${KHAL_GREP_DATERANGE:?}" '+%F %R')}" \
+rangeStart="${KHAL_RANGE_START:-$(date --date "${KHAL_GREP_DATERANGE:?} ago" '+%F %R')}"
+rangeEnd="${KHAL_RANGE_END:-$(date --date "${KHAL_GREP_DATERANGE:?}" '+%F %R')}"
+memoizationDuration="${KHAL_RANGE_MEMOIZATION_DURATION:-$KHAL_DEFAULT_MEMOIZATION_DURATION}"
+[ -z "$memoizationDuration" ] \
+    || memoizer=(memoizeCall --memoize-group khal --context "$rangeStart" --context "$rangeEnd" --successful-only --for "$memoizationDuration")
+
+"${memoizer[@]}" khal-wrapper "${khalMainArgs[@]}" --no-color list "${khalListArgs[@]}" --day-format '' --format "{start-date-long} {start-time${isFullTime:+-full}}"$'\t'"{end-date-long} {end-time${isFullTime:+-full}}"$'\t\a\f{title}' "$rangeStart" "$rangeEnd" \
     | grep "${grepArgs[@]}" "$@" \
     | eval removeTitleMarker \
     "${reldateCommand:+|}" '"${reldateCommand[@]}"' \

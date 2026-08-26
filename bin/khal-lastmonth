@@ -71,4 +71,5 @@ startDate="$(calculateDate $((offset + count)))"
 
 KHAL_TIMESPAN_OVERALL_PRECISION='--precision h' \
 KHAL_TIMESPAN_QUADRANT_PRECISION='--workday' \
+KHAL_RANGE_MEMOIZATION_DURATION='1d' \
 exec khal-timespan "$@" "$startDate" "$endDate"
