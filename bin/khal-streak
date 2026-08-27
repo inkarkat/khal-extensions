@@ -120,16 +120,32 @@ sortNewestAndShortestFirst()
 calculateStreaks()
 {
     awk -F '[[:space:]:-]' -v changeFormat='%Y %m %d 0 0 0' -v gapSeconds=86400 '
-function calculateGap(startEpoch, endEpoch,      startChangeTime, endChangeTime, timeGapSeconds) {
+function getNextEpoch(epoch,      nextEpoch, currentChangeTime, nextChangeTime) {
+    currentChangeTime = nextChangeTime = strftime(changeFormat, epoch, 1)
+    for (nextEpoch = epoch; nextChangeTime == currentChangeTime; nextChangeTime = strftime(changeFormat, nextEpoch, 1)) {
+	nextEpoch += gapSeconds
+    }
+    return nextEpoch
+}
+function hasGap(startEpoch, endEpoch,      startChangeTime, endChangeTime) {
     startChangeTime = strftime(changeFormat, startEpoch, 1)
     endChangeTime = strftime(changeFormat, endEpoch, 1)
-    timeGapSeconds = mktime(endChangeTime, 1) - mktime(startChangeTime, 1)
-    return (timeGapSeconds > 0 ? int(timeGapSeconds / gapSeconds + 0.5) : 0)
+    if (startChangeTime == endChangeTime) return 0  # same slot
+    if (strftime(changeFormat, getNextEpoch(startEpoch), 1) == endChangeTime) return 0  # subsequent slot
+    return 1	# at least one unoccupied slot in between
 }
-function checkGap(startEpoch, startTime,endEpoch,      currentGap) {
-    currentGap = calculateGap(startEpoch, endEpoch)
-    # print "****currentGap=" currentGap > "/dev/stderr"
-    if (currentGap > 1) {
+function calculateGap(startEpoch, endEpoch,      startChangeTime, endChangeTime, changeTime, epoch, timeGap) {
+    startChangeTime = changeTime = strftime(changeFormat, startEpoch, 1)
+    endChangeTime = strftime(changeFormat, endEpoch, 1)
+    epoch = startEpoch
+    for (timeGap = 0; changeTime != endChangeTime; ++timeGap) {
+	epoch = getNextEpoch(epoch)
+	changeTime = strftime(changeFormat, epoch, 1)
+    }
+    return timeGap
+}
+function checkGap(startEpoch, startTime, endEpoch,      streakGap) {
+    if (hasGap(startEpoch, endEpoch)) {
 	if (previousStartTime != "") {
 	    streakGap = calculateGap(previousStartEpoch, streakEndEpoch)
 	    printf("%d\t%s\t%s\n", streakGap, previousStartTime, streakEndTime)
