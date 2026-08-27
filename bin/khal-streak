@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, they can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-e|--regexp PATTERN [-e ...]] [--weekly] [--count N] [--earliest|--longest|--shortest] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-e|--regexp PATTERN [-e ...]] [--weekly|--monthly] [--count N] [--earliest|--longest|--shortest] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -30,6 +30,8 @@ HELPDESCRIPTION
     --regexp|-e PATTERN	Only consider events that whose title matches PATTERN.
     --weekly		Consider events on each consecutive week instead of each
 			consecutive day.
+    --monthly		Consider events on each consecutive month instead of
+			each consecutive day.
     --count N		Use the N'th streak instead of the most recent one.
     --earliest		Use / start counting from the earliest encountered
 			streak instead of the latest.
@@ -61,7 +63,8 @@ do
 			colorArg=("$1"); shift;;
 	--regexp|-e)	shift; addPattern "${1:?}"; shift;;
 	--regexp=*)	addPattern "${1#--regexp=}"; shift;;
-	--weekly)	shift; changeFormat='%G %V'; gapSeconds=604800;;
+	--weekly)	shift; changeFormat='%G %V'; gapSeconds=$((86400 * 7));;
+	--monthly)	shift; changeFormat='%Y %m'; gapSeconds=$((86400 * 28));;   # Note: 28 days is the shortest month, so this is a safe lower bound for the gap.
 	--count)	shift; count="${1:?}"; shift;;
 
 	-[ad])		khalArgs+=("$1" "${2?}"); shift; shift;;
