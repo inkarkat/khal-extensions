@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, they can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-e|--regexp PATTERN [-e ...]] [--count N] [--earliest|--longest|--shortest] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-e|--regexp PATTERN [-e ...]] [--weekly] [--count N] [--earliest|--longest|--shortest] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -28,6 +28,8 @@ HELPDESCRIPTION
     echo
     cat <<HELPTEXT
     --regexp|-e PATTERN	Only consider events that whose title matches PATTERN.
+    --weekly		Consider events on each consecutive week instead of each
+			consecutive day.
     --count N		Use the N'th streak instead of the most recent one.
     --earliest		Use / start counting from the earliest encountered
 			streak instead of the latest.
@@ -36,6 +38,8 @@ HELPDESCRIPTION
 HELPTEXT
 }
 
+changeFormat='%Y %m %d'
+gapSeconds=86400
 matcher=
 matchFormat=
 typeset -a grepArgs=()
@@ -57,6 +61,7 @@ do
 			colorArg=("$1"); shift;;
 	--regexp|-e)	shift; addPattern "${1:?}"; shift;;
 	--regexp=*)	addPattern "${1#--regexp=}"; shift;;
+	--weekly)	shift; changeFormat='%G %V'; gapSeconds=604800;;
 	--count)	shift; count="${1:?}"; shift;;
 
 	-[ad])		khalArgs+=("$1" "${2?}"); shift; shift;;
@@ -119,7 +124,7 @@ sortNewestAndShortestFirst()
 
 calculateStreaks()
 {
-    awk -F '[[:space:]:-]' -v changeFormat='%Y %m %d 0 0 0' -v gapSeconds=86400 '
+    awk -F '[[:space:]:-]' -v changeFormat="$changeFormat" -v gapSeconds=$gapSeconds '
 function getNextEpoch(epoch,      nextEpoch, currentChangeTime, nextChangeTime) {
     currentChangeTime = nextChangeTime = strftime(changeFormat, epoch, 1)
     for (nextEpoch = epoch; nextChangeTime == currentChangeTime; nextChangeTime = strftime(changeFormat, nextEpoch, 1)) {
