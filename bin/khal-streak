@@ -36,10 +36,14 @@ HELPDESCRIPTION
 HELPTEXT
 }
 
-typeset -a sedArgs=()
+matcher=
+matchFormat=
+typeset -a grepArgs=()
 addPattern()
 {
-    sedArgs+=(-e "/${1//^/$'\t\a\f'}/s/\t\a\f.*\$//p")
+    grepArgs+=(-e "${1//^/$'\t\a\f'}")
+    matcher=findMatchingEvents
+    matchFormat=$'\t\a\f{title}'
 }
 typeset -a colorArg=()
 count=1
@@ -65,14 +69,13 @@ set -- "${args[@]}" "$@"
 listEvents()
 {
     KHAL_MEMOIZE=t khal-wrapper --no-color list --once "${khalArgs[@]}" \
-	    --day-format '' --format $'{start-date-long} {start-time-full}\t{end-date-long} {end-time-full}\t\a\f{title}' \
+	    --day-format '' --format $'{start-date-long} {start-time-full}\t{end-date-long} {end-time-full}'"$matchFormat" \
 	    "$SEARCH_START" "$SEARCH_END"
 }
 
 findMatchingEvents()
 {
-    eval listEvents \
-	"${sedArgs:+|}" 'sed -n "${sedArgs[@]}"'
+    grep "${grepArgs[@]}"
 }
 
 handleAllAndMultiDay()
@@ -165,7 +168,8 @@ readonly SEARCH_END="${KHAL_RANGE_END:-$ABSOLUTE_END}"
 unset KHAL_RANGE_START KHAL_RANGE_END
 
 
-findMatchingEvents \
+eval listEvents \
+    "${matcher:+|}$matcher" \
     | handleAllAndMultiDay \
     | sort --numeric-sort --reverse \
     | calculateStreaks
