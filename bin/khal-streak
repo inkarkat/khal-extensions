@@ -159,6 +159,15 @@ END {
 '
 }
 
+getStreaks()
+{
+    eval listEvents \
+	"${matcher:+|}$matcher" \
+	| handleAllAndMultiDay \
+	| sortNewestAndShortestFirst \
+	| calculateStreaks
+}
+
 doRange()
 {
     local start="${1:?}"; shift
@@ -180,12 +189,7 @@ readonly SEARCH_START="${KHAL_RANGE_START:-$ABSOLUTE_START}"
 readonly SEARCH_END="${KHAL_RANGE_END:-$ABSOLUTE_END}"
 unset KHAL_RANGE_START KHAL_RANGE_END
 
-
-eval listEvents \
-    "${matcher:+|}$matcher" \
-    | handleAllAndMultiDay \
-    | sortNewestAndShortestFirst \
-    | calculateStreaks
+eval "$(${TEST:+testeval --} "${TEST:-echo}" getStreaks)"
 
 exit
 # start="${start/% / 00:00}"  # Add time to all-day event.
