@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, they can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-e|--regexp PATTERN [-e ...]] [--weekly|--monthly|--yearly] [--count N] [--earliest|--longest|--shortest] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-e|--regexp PATTERN [-e ...]] [---workday|--weekly|--monthly|--yearly] [--count N] [--earliest|--longest|--shortest] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -26,8 +26,12 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     echo
+    local -r timespanFormat="$(durationToSeconds --get-short-usage format 2>/dev/null || echo TIMESPAN)"
     cat <<HELPTEXT
     --regexp|-e PATTERN	Only consider events that whose title matches PATTERN.
+    --workday		Consider events on each consecutive workday instead of
+			each consecutive day. Weekends are ignored and don't
+			break a streak.
     --weekly		Consider events on each consecutive week instead of each
 			consecutive day.
     --monthly		Consider events on each consecutive month instead of
@@ -43,6 +47,7 @@ HELPTEXT
 }
 
 changeFormat='%Y %m %d'
+changePattern=
 gapSeconds=86400
 matcher=
 matchFormat=
@@ -65,6 +70,7 @@ do
 			colorArg=("$1"); shift;;
 	--regexp|-e)	shift; addPattern "${1:?}"; shift;;
 	--regexp=*)	addPattern "${1#--regexp=}"; shift;;
+	--workday)	shift; changeFormat='%Y %m %d %u'; changePattern=' [1-5]$';;
 	--weekly)	shift; changeFormat='%G %V'; gapSeconds=$((86400 * 7));;
 	--monthly)	shift; changeFormat='%Y %m'; gapSeconds=$((86400 * 28));;   # Note: 28 days is the shortest month, so this is a safe lower bound for the gap.
 	--yearly)	shift; changeFormat='%Y'; gapSeconds=$((86400 * 365));;
@@ -130,10 +136,18 @@ sortNewestAndShortestFirst()
 
 calculateStreaks()
 {
-    awk -F '[[:space:]:-]' -v changeFormat="$changeFormat" -v gapSeconds=$gapSeconds '
+    awk -F '[[:space:]:-]' \
+	-v "changeFormat=$changeFormat" \
+	-v "changePattern=${changePattern//\\/\\\\}" \
+	-v gapSeconds=$gapSeconds \
+'
 function getNextEpoch(epoch,      nextEpoch, currentChangeTime, nextChangeTime) {
     currentChangeTime = nextChangeTime = strftime(changeFormat, epoch, 1)
-    for (nextEpoch = epoch; nextChangeTime == currentChangeTime; nextChangeTime = strftime(changeFormat, nextEpoch, 1)) {
+    for ( \
+	nextEpoch = epoch; \
+	nextChangeTime == currentChangeTime || (changePattern != "" && nextChangeTime !~ changePattern); \
+	nextChangeTime = strftime(changeFormat, nextEpoch, 1) \
+    ) {
 	nextEpoch += gapSeconds
     }
     return nextEpoch
@@ -173,6 +187,9 @@ BEGIN {
     startTime = $1 "-" $2 "-" $3 " " $4 ":" $5
     endTime = $6 "-" $7 "-" $8 " " $9 ":" $10
     endEpoch = mktime($6 " " $7 " " $8 " " $9 " " $10 " 00", 1)
+
+    # Ignore events that do not match the change pattern, if one is specified.
+    if (changePattern != "" && strftime(changeFormat, endEpoch, 1) !~ changePattern) next
 
     checkGap(endEpoch, endTime, previousStartEpoch)
 
