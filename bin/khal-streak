@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, they can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-e|--regexp PATTERN [-e ...]] [---workday|--weekly|--monthly|--yearly] [--count N] [--earliest|--longest|--shortest] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-e|--regexp PATTERN [-e ...]] [---workday|--weekendday|--weekly|--monthly|--yearly] [--count N] [--earliest|--longest|--shortest] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -31,6 +31,9 @@ HELPDESCRIPTION
     --regexp|-e PATTERN	Only consider events that whose title matches PATTERN.
     --workday		Consider events on each consecutive workday instead of
 			each consecutive day. Weekends are ignored and don't
+			break a streak.
+    --weekendday	Consider events on each consecutive weekend day instead
+			of each consecutive day. Workdays are ignored and don't
 			break a streak.
     --weekly		Consider events on each consecutive week instead of each
 			consecutive day.
@@ -71,6 +74,7 @@ do
 	--regexp|-e)	shift; addPattern "${1:?}"; shift;;
 	--regexp=*)	addPattern "${1#--regexp=}"; shift;;
 	--workday)	shift; changeFormat='%Y %m %d %u'; changePattern=' [1-5]$';;
+	--weekendday)	shift; changeFormat='%Y %m %d %u'; changePattern=' [67]$';;
 	--weekly)	shift; changeFormat='%G %V'; gapSeconds=$((86400 * 7));;
 	--monthly)	shift; changeFormat='%Y %m'; gapSeconds=$((86400 * 28));;   # Note: 28 days is the shortest month, so this is a safe lower bound for the gap.
 	--yearly)	shift; changeFormat='%Y'; gapSeconds=$((86400 * 365));;
