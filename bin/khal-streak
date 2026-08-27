@@ -104,6 +104,19 @@ $1 "-" $2 "-" $3 == $6 "-" $7 "-" $8  && $4 == 0 && $5 == 0 && $9 == 0 && $10 ==
 '
 }
 
+sortNewestAndShortestFirst()
+{
+    # Workaround: sort only suports a single field separator, but I'd like to
+    # maintain the original (mixed [- :]) date/time format for the output, so
+    # temporarily prepend the sort keys as tab-separated fields, sort by those, and
+    # then remove them again.
+    # Streak calculation goes backwards in time, so sort by the end date/time first,
+    # then the start date/time.
+    awk -F '[[:space:]:-]' '{ print $1 "\t" $2 "\t" $3 "\t" $4 "\t" $5 "\t" $6 "\t" $7 "\t" $8 "\t" $9 "\t" $10 "\t" $0 }' \
+	| sort --field-separator $'\t' --numeric-sort --key 6,6 --key 7,7 --key 8,8 --key 9,9 --key 10,10 --key 1,1 --key 2,2 --key 3,3 --key 4,4 --key 5,5 --reverse \
+	| cut --fields 11-
+}
+
 calculateStreaks()
 {
     awk -F '[[:space:]:-]' -v changeFormat='%Y %m %d 0 0 0' -v gapSeconds=86400 '
@@ -171,7 +184,7 @@ unset KHAL_RANGE_START KHAL_RANGE_END
 eval listEvents \
     "${matcher:+|}$matcher" \
     | handleAllAndMultiDay \
-    | sort --numeric-sort --reverse \
+    | sortNewestAndShortestFirst \
     | calculateStreaks
 
 exit
