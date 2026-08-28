@@ -62,8 +62,10 @@ everySeconds=
 matcher=
 matchFormat=
 typeset -a grepArgs=()
+typeset -a khalGrepArgs=()
 addPattern()
 {
+    khalGrepArgs+=(-e "${1:?}")
     grepArgs+=(-e "${1//^/$'\t\a\f'}")
     matcher=findMatchingEvents
     matchFormat=$'\t\a\f{title}'
@@ -246,7 +248,10 @@ doRange()
 	export KHAL_RANGE_START="$start" KHAL_RANGE_END="$end"
 	"$khalExtension" "${colorArg[@]}" "${khalArgs[@]}" "$@"
     else
-	khal-timespan "${colorArg[@]}" "${khalArgs[@]}" "$@" "$start" "$end"
+	# DWIM: If the user filtered events with -e|--regexp, also apply that filter to
+	# the event listing of the streak, so that unrelated tasks from that range are
+	# omitted.
+	khal-timespan "${colorArg[@]}" ${khalGrepArgs:+grep} "${khalGrepArgs[@]}" "${khalArgs[@]}" "$@" "$start" "$end"
     fi
 }
 
