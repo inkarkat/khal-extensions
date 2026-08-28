@@ -230,7 +230,7 @@ END {
 
 getStreaks()
 {
-    eval listEvents \
+    eval "$(${TEST:+testeval --point input-events --} "${TEST:-echo}" listEvents)" \
 	"${matcher:+|}$matcher" \
 	| handleAllAndMultiDay \
 	| sortNewestAndShortestFirst \
