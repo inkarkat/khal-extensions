@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, they can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-e|--regexp PATTERN [-e ...]] [---workday|--weekendday|--day-of-week Monday|Tuesday|...|--weekly|--monthly|--yearly] [--count N] [--earliest|--longest|--shortest] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-e|--regexp PATTERN [-e ...]] [---workday|--weekendday|--day-of-week Monday|Tuesday|...|--weekly|--monthly|--yearly|--every TIMESPAN] [--count N] [--earliest|--longest|--shortest] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -44,6 +44,9 @@ HELPDESCRIPTION
 			each consecutive day.
     --yearly		Consider events on each consecutive year instead of each
 			consecutive day.
+    --every ${timespanFormat}
+			Consider and count events that are at most TIMESPAN
+			apart instead of each consecutive day.
     --count N		Use the N'th streak instead of the most recent one.
     --earliest		Use / start counting from the earliest encountered
 			streak instead of the latest.
@@ -55,6 +58,7 @@ HELPTEXT
 changeFormat='%Y %m %d'
 changePattern=
 gapSeconds=86400
+everySeconds=
 matcher=
 matchFormat=
 typeset -a grepArgs=()
@@ -82,6 +86,7 @@ do
 	--weekly)	shift; changeFormat='%G %V'; gapSeconds=$((86400 * 7));;
 	--monthly)	shift; changeFormat='%Y %m'; gapSeconds=$((86400 * 28));;   # Note: 28 days is the shortest month, so this is a safe lower bound for the gap.
 	--yearly)	shift; changeFormat='%Y'; gapSeconds=$((86400 * 365));;
+	--every)	shift; everySeconds=$(durationToSeconds -- "${1:?}") || { printf >&2 'ERROR: Illegal TIMESPAN: %s\n' "$1"; exit 2; }; shift;;
 	--count)	shift; count="${1:?}"; shift;;
 
 	-[ad])		khalArgs+=("$1" "${2?}"); shift; shift;;
@@ -148,6 +153,7 @@ calculateStreaks()
 	-v "changeFormat=$changeFormat" \
 	-v "changePattern=${changePattern//\\/\\\\}" \
 	-v gapSeconds=$gapSeconds \
+	-v everySeconds=$everySeconds \
 '
 function getNextEpoch(epoch,      nextEpoch, currentChangeTime, nextChangeTime) {
     currentChangeTime = nextChangeTime = strftime(changeFormat, epoch, 1)
@@ -161,21 +167,29 @@ function getNextEpoch(epoch,      nextEpoch, currentChangeTime, nextChangeTime) 
     return nextEpoch
 }
 function hasGap(startEpoch, endEpoch,      startChangeTime, endChangeTime) {
-    startChangeTime = strftime(changeFormat, startEpoch, 1)
-    endChangeTime = strftime(changeFormat, endEpoch, 1)
-    if (startChangeTime == endChangeTime) return 0  # same slot
-    if (strftime(changeFormat, getNextEpoch(startEpoch), 1) == endChangeTime) return 0  # subsequent slot
-    return 1	# at least one unoccupied slot in between
+    if (everySeconds == "") {
+	startChangeTime = strftime(changeFormat, startEpoch, 1)
+	endChangeTime = strftime(changeFormat, endEpoch, 1)
+	if (startChangeTime == endChangeTime) return 0  # same slot
+	if (strftime(changeFormat, getNextEpoch(startEpoch), 1) == endChangeTime) return 0  # subsequent slot
+	return 1	# at least one unoccupied slot in between
+    } else {
+	return (endEpoch - startEpoch > everySeconds)
+    }
 }
 function calculateGap(startEpoch, endEpoch,      startChangeTime, endChangeTime, changeTime, epoch, timeGap) {
-    startChangeTime = changeTime = strftime(changeFormat, startEpoch, 1)
-    endChangeTime = strftime(changeFormat, endEpoch, 1)
-    epoch = startEpoch
-    for (timeGap = 0; changeTime != endChangeTime; ++timeGap) {
-	epoch = getNextEpoch(epoch)
-	changeTime = strftime(changeFormat, epoch, 1)
+    if (everySeconds == "") {
+	startChangeTime = changeTime = strftime(changeFormat, startEpoch, 1)
+	endChangeTime = strftime(changeFormat, endEpoch, 1)
+	epoch = startEpoch
+	for (timeGap = 0; changeTime != endChangeTime; ++timeGap) {
+	    epoch = getNextEpoch(epoch)
+	    changeTime = strftime(changeFormat, epoch, 1)
+	}
+	return timeGap
+    } else {
+	return streakCounter
     }
-    return timeGap
 }
 function checkGap(startEpoch, startTime, endEpoch,      streakGap) {
     if (hasGap(startEpoch, endEpoch)) {
@@ -185,7 +199,9 @@ function checkGap(startEpoch, startTime, endEpoch,      streakGap) {
 	}
 	streakEndEpoch = startEpoch
 	streakEndTime = startTime
-	# print "****streakEndTime=" streakEndTime > "/dev/stderr"
+	streakCounter = 0
+    } else {
+	++streakCounter
     }
 }
 BEGIN {
