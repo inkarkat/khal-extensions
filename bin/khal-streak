@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, they can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-e|--regexp PATTERN [-e ...]] [--count N] [--earliest|--longest|--shortest] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-e|--regexp PATTERN [-e ...]] [---workday|--weekendday|--day-of-week Monday|Tuesday|...|--weekly|--monthly|--yearly|--every TIMESPAN] [--count N] [--earliest|--longest|--shortest] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -26,8 +26,27 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     echo
+    local -r timespanFormat="$(durationToSeconds --get-short-usage format 2>/dev/null || echo TIMESPAN)"
     cat <<HELPTEXT
     --regexp|-e PATTERN	Only consider events that whose title matches PATTERN.
+    --workday		Consider events on each consecutive workday instead of
+			each consecutive day. Weekends are ignored and don't
+			break a streak.
+    --weekendday	Consider events on each consecutive weekend day instead
+			of each consecutive day. Workdays are ignored and don't
+			break a streak.
+    --day-of-week DAY	Consider events on each consecutive particular DAY (e.g.
+			every Monday) instead of each consecutive day. Other
+			days are ignored and don't break a streak.
+    --weekly		Consider events on each consecutive week instead of each
+			consecutive day.
+    --monthly		Consider events on each consecutive month instead of
+			each consecutive day.
+    --yearly		Consider events on each consecutive year instead of each
+			consecutive day.
+    --every ${timespanFormat}
+			Consider and count events that are at most TIMESPAN
+			apart instead of each consecutive day.
     --count N		Use the N'th streak instead of the most recent one.
     --earliest		Use / start counting from the earliest encountered
 			streak instead of the latest.
@@ -36,6 +55,10 @@ HELPDESCRIPTION
 HELPTEXT
 }
 
+changeFormat='%Y %m %d'
+changePattern=
+gapSeconds=86400
+everySeconds=
 matcher=
 matchFormat=
 typeset -a grepArgs=()
@@ -57,6 +80,13 @@ do
 			colorArg=("$1"); shift;;
 	--regexp|-e)	shift; addPattern "${1:?}"; shift;;
 	--regexp=*)	addPattern "${1#--regexp=}"; shift;;
+	--workday)	shift; changeFormat='%Y %m %d %u'; changePattern=' [1-5]$';;
+	--weekendday)	shift; changeFormat='%Y %m %d %u'; changePattern=' [67]$';;
+	--day-of-week)	shift; changeFormat='%Y %m %d %A'; changePattern=" ${1:?}\$"; shift;;
+	--weekly)	shift; changeFormat='%G %V'; gapSeconds=$((86400 * 7));;
+	--monthly)	shift; changeFormat='%Y %m'; gapSeconds=$((86400 * 28));;   # Note: 28 days is the shortest month, so this is a safe lower bound for the gap.
+	--yearly)	shift; changeFormat='%Y'; gapSeconds=$((86400 * 365));;
+	--every)	shift; everySeconds=$(durationToSeconds -- "${1:?}") || { printf >&2 'ERROR: Illegal TIMESPAN: %s\n' "$1"; exit 2; }; shift;;
 	--count)	shift; count="${1:?}"; shift;;
 
 	-[ad])		khalArgs+=("$1" "${2?}"); shift; shift;;
@@ -119,24 +149,59 @@ sortNewestAndShortestFirst()
 
 calculateStreaks()
 {
-    awk -F '[[:space:]:-]' -v changeFormat='%Y %m %d 0 0 0' -v gapSeconds=86400 '
-function calculateGap(startEpoch, endEpoch,      startChangeTime, endChangeTime, timeGapSeconds) {
-    startChangeTime = strftime(changeFormat, startEpoch, 1)
-    endChangeTime = strftime(changeFormat, endEpoch, 1)
-    timeGapSeconds = mktime(endChangeTime, 1) - mktime(startChangeTime, 1)
-    return (timeGapSeconds > 0 ? int(timeGapSeconds / gapSeconds + 0.5) : 0)
+    awk -F '[[:space:]:-]' \
+	-v "changeFormat=$changeFormat" \
+	-v "changePattern=${changePattern//\\/\\\\}" \
+	-v gapSeconds=$gapSeconds \
+	-v everySeconds=$everySeconds \
+'
+function getNextEpoch(epoch,      nextEpoch, currentChangeDateTime, nextChangeDateTime) {
+    currentChangeDateTime = nextChangeDateTime = strftime(changeFormat, epoch, 1)
+    for ( \
+	nextEpoch = epoch; \
+	nextChangeDateTime == currentChangeDateTime || (changePattern != "" && nextChangeDateTime !~ changePattern); \
+	nextChangeDateTime = strftime(changeFormat, nextEpoch, 1) \
+    ) {
+	nextEpoch += gapSeconds
+    }
+    return nextEpoch
 }
-function checkGap(startEpoch, startTime,endEpoch,      currentGap) {
-    currentGap = calculateGap(startEpoch, endEpoch)
-    # print "****currentGap=" currentGap > "/dev/stderr"
-    if (currentGap > 1) {
+function hasGap(startEpoch, endEpoch,      startChangeDateTime, endChangeDateTime) {
+    if (everySeconds == "") {
+	startChangeDateTime = strftime(changeFormat, startEpoch, 1)
+	endChangeDateTime = strftime(changeFormat, endEpoch, 1)
+	if (startChangeDateTime == endChangeDateTime) return 0  # same slot
+	if (strftime(changeFormat, getNextEpoch(startEpoch), 1) == endChangeDateTime) return 0  # subsequent slot
+	return 1	# at least one unoccupied slot in between
+    } else {
+	return (endEpoch - startEpoch > everySeconds)
+    }
+}
+function calculateStreak(startEpoch, endEpoch,      startChangeDateTime, endChangeDateTime, changeDateTime, epoch, streakCnt) {
+    if (everySeconds == "") {
+	startChangeDateTime = changeDateTime = strftime(changeFormat, startEpoch, 1)
+	endChangeDateTime = strftime(changeFormat, endEpoch, 1)
+	epoch = startEpoch
+	for (streakCnt = 0; changeDateTime != endChangeDateTime; ++streakCnt) {
+	    epoch = getNextEpoch(epoch)
+	    changeDateTime = strftime(changeFormat, epoch, 1)
+	}
+	return streakCnt
+    } else {
+	return eventCnt
+    }
+}
+function checkStreak(startEpoch, startTime, endEpoch,      streakCount) {
+    if (hasGap(startEpoch, endEpoch)) {
 	if (previousStartTime != "") {
-	    streakGap = calculateGap(previousStartEpoch, streakEndEpoch)
-	    printf("%d\t%s\t%s\n", streakGap, previousStartTime, streakEndTime)
+	    streakCount = calculateStreak(previousStartEpoch, streakEndEpoch)
+	    printf("%d\t%s\t%s\n", streakCount, previousStartTime, streakEndTime)
 	}
 	streakEndEpoch = startEpoch
 	streakEndTime = startTime
-	# print "****streakEndTime=" streakEndTime > "/dev/stderr"
+	eventCnt = 0
+    } else {
+	++eventCnt
     }
 }
 BEGIN {
@@ -147,14 +212,16 @@ BEGIN {
     endTime = $6 "-" $7 "-" $8 " " $9 ":" $10
     endEpoch = mktime($6 " " $7 " " $8 " " $9 " " $10 " 00", 1)
 
-    checkGap(endEpoch, endTime, previousStartEpoch)
+    # Ignore events that do not match the change pattern, if one is specified.
+    if (changePattern != "" && strftime(changeFormat, endEpoch, 1) !~ changePattern) next
+
+    checkStreak(endEpoch, endTime, previousStartEpoch)
 
     previousStartEpoch = mktime($1 " " $2 " " $3 " " $4 " " $5 " 0", 1)
     previousStartTime = startTime
-    # print "**** previousStartEpoch=" previousStartEpoch ", previousStartTime=" previousStartTime > "/dev/stderr"
 }
 END {
-    checkGap(0, "", previousStartEpoch)
+    checkStreak(0, "", previousStartEpoch)
 }
 '
 }
