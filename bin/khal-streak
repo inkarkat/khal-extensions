@@ -92,6 +92,8 @@ do
 	--every)	shift; everySeconds=$(durationToSeconds -- "${1:?}") || { printf >&2 'ERROR: Illegal TIMESPAN: %s\n' "$1"; exit 2; }; shift;;
 	--count)	shift; count="${1:?}"; shift;;
 	--earliest)	shift; streakSelector=(tac);;
+	--longest)	shift; streakSelector=(sort --field-separator $'\t' --numeric-sort --key 1,1 --stable --reverse);;
+	--shortest)	shift; streakSelector=(sort --field-separator $'\t' --numeric-sort --key 1,1 --stable);;
 
 	-[ad])		khalArgs+=("$1" "${2?}"); shift; shift;;
 	--)		args+=("$1"); shift; break;;
