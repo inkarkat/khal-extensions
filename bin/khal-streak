@@ -72,6 +72,7 @@ addPattern()
 }
 typeset -a colorArg=()
 count=1
+typeset -a streakSelector=()
 typeset -a args=()
 typeset -a khalArgs=()
 while [ $# -ne 0 ]
@@ -90,6 +91,7 @@ do
 	--yearly)	shift; changeFormat='%Y'; gapSeconds=$((86400 * 365));;
 	--every)	shift; everySeconds=$(durationToSeconds -- "${1:?}") || { printf >&2 'ERROR: Illegal TIMESPAN: %s\n' "$1"; exit 2; }; shift;;
 	--count)	shift; count="${1:?}"; shift;;
+	--earliest)	shift; streakSelector=(tac);;
 
 	-[ad])		khalArgs+=("$1" "${2?}"); shift; shift;;
 	--)		args+=("$1"); shift; break;;
@@ -257,7 +259,10 @@ doRange()
 
 doStreak()
 {
-    readarray -t streaks < <(getStreaks)
+    readarray -t streaks < <(
+	eval getStreaks \
+	    "${streakSelector:+|}" '"${streakSelector[@]}"'
+    )
     if [ $count -gt ${#streaks[@]} ]; then
 	streaksPlural=s; [ ${#streaks[@]} -eq 1 ] && streaksPlural=
 	printf >&2 'ERROR: Only %d streak%s found.\n' ${#streaks[@]} "$streaksPlural"
