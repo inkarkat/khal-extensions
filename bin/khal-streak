@@ -257,8 +257,14 @@ doRange()
 
 doStreak()
 {
-    < <(getStreaks) IFS=$'\t' read -r _ streakStart streakEnd || return $?
+    readarray -t streaks < <(getStreaks)
+    if [ $count -gt ${#streaks[@]} ]; then
+	streaksPlural=s; [ ${#streaks[@]} -eq 1 ] && streaksPlural=
+	printf >&2 'ERROR: Only %d streak%s found.\n' ${#streaks[@]} "$streaksPlural"
+	exit 1
+    fi
 
+    IFS=$'\t' read -r _ streakStart streakEnd <<<"${streaks[count - 1]}" || return $?
     ${DEBUG:+debuglogf '%q / %q' "$streakStart" "$streakEnd"}
     doRange "$streakStart" "$streakEnd" "$@"
 }
