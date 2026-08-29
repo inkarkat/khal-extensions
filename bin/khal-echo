@@ -1,0 +1,3 @@
+#!/bin/bash
+
+echo "${*}${*:+${KHAL_RANGE_START:+ }}${KHAL_RANGE_START}${KHAL_RANGE_END:+ }${KHAL_RANGE_END}"
