@@ -1,0 +1,19 @@
+#!/bin/bash
+
+printUsage()
+{
+    cat <<HELPTEXT
+Show all future events starting from tomorrow, followed by the total duration.
+HELPTEXT
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[KHAL-LIST-ARGS ...] [-?|-h|--help]'
+}
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+esac
+
+readonly ABSOLUTE_END='2099-12-31 23:59'    # XXX: khal 0.13.0 scales linearly, and dates beyond the year 2999 cannot be parsed
+
+KHAL_TIMESPAN_OVERALL_PRECISION='--precision h' \
+KHAL_TIMESPAN_QUADRANT_PRECISION='--workday' \
+exec khal-timespan "$@" tomorrow "$ABSOLUTE_END"
