@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, they can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-e|--regexp PATTERN [-e ...]] [---workday|--weekendday|--day-of-week Monday|Tuesday|...|--weekly|--monthly|--yearly|--every TIMESPAN] [--count N] [--earliest|--longest|--shortest] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-e|--regexp PATTERN [-e ...]] [---workday|--weekendday|--day-of-week Monday|Tuesday|...|--weekly|--monthly|--yearly|--every TIMESPAN] $(fieldFilterNumber --get-short-usage compare-op 2>/dev/null) [--count N] [--earliest|--longest|--shortest] [KHAL-COMMAND|KHAL-LIST-ARGS ...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -47,6 +47,9 @@ HELPDESCRIPTION
     --every ${timespanFormat}
 			Consider and count events that are at most TIMESPAN
 			apart instead of each consecutive day.
+HELPTEXT
+    fieldFilterNumber --get-long-usage compare-op 'consider events where the streak count' 2>/dev/null
+    cat <<HELPTEXT
     --count N		Use the N'th streak instead of the most recent one.
     --earliest		Use / start counting from the earliest encountered
 			streak instead of the latest.
@@ -72,6 +75,8 @@ addPattern()
 }
 typeset -a colorArg=()
 count=1
+typeset -a streakFilter=()
+typeset -a streakFilterArgs=()
 typeset -a streakSelector=()
 typeset -a args=()
 typeset -a khalArgs=()
@@ -97,6 +102,18 @@ do
 
 	-[ad])		khalArgs+=("$1" "${2?}"); shift; shift;;
 	--)		args+=("$1"); shift; break;;
+	-*)		if type -t -- fieldFilterNumber >/dev/null \
+			    && argCount=$(fieldFilterNumber --understand-for compare-op --understands "$@")
+			then
+			    streakFilterArgs+=(1 "${@:1:argCount}")
+			    streakFilter=(fieldFilterNumber --field-separator $'\t')
+			    shift $argCount
+			elif [ $? -eq 2 ]; then
+			    exit 2
+			else
+			    args+=("$1"); shift
+			fi
+			;;
 	*)		args+=("$1"); shift;;
     esac
 done
@@ -263,11 +280,17 @@ doStreak()
 {
     readarray -t streaks < <(
 	eval getStreaks \
+	    "${streakFilter:+|}" '"${streakFilter[@]}" "${streakFilterArgs[@]}"' \
 	    "${streakSelector:+|}" '"${streakSelector[@]}"'
     )
     if [ $count -gt ${#streaks[@]} ]; then
-	streaksPlural=s; [ ${#streaks[@]} -eq 1 ] && streaksPlural=
-	printf >&2 'ERROR: Only %d streak%s found.\n' ${#streaks[@]} "$streaksPlural"
+	local streaksCount="Only ${#streaks[@]}"
+	local streaksPlural=s
+	case ${#streaks[@]} in
+	    0)	streaksCount='No';;
+	    1)	streaksPlural=;;
+	esac
+	printf >&2 'ERROR: %s streak%s found.\n' "$streaksCount" "$streaksPlural"
 	exit 1
     fi
 

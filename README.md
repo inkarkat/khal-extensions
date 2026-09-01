@@ -7,6 +7,7 @@ These are some personal aliases, shortcuts, and extensions that make (my) work w
 ### Dependencies
 
 * Bash
+* [inkarkat/shell-fields](https://github.com/inkarkat/shell-fields) for the `khal-streak` command's streak count filtering
 * [inkarkat/shell-debugging](https://github.com/inkarkat/shell-debugging) for debugging (optional)
 
 ### Installation
