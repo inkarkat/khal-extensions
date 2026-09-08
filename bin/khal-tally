@@ -1,5 +1,7 @@
 #!/bin/bash
 
+${DEBUG:+eval $(debugtrace -o $- --envs ${!KHAL_*} \; -- "$@")}
+
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can

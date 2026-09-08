@@ -3,6 +3,8 @@ shopt -qs extglob
 
 : ${KHAL_DEFAULT_MEMOIZATION_DURATION=10m}
 
+${DEBUG:+eval $(debugtrace -o $- --envs ${!KHAL_*} \; -- "$@")}
+
 typeset -a khalListArgs=()
 typeset -a khalMainArgs=()
 while [ $# -ne 0 ]
