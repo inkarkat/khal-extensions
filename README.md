@@ -2,6 +2,8 @@
 
 _Additions and tweaks to the khal CLI._
 
+![Build Status](https://github.com/inkarkat/khal-extensions/actions/workflows/build.yml/badge.svg)
+
 These are some personal aliases, shortcuts, and extensions that make (my) work with the [khal](https://lostpackets.de/khal/) / [vdirsyncer](https://github.com/pimutils/vdirsyncer) command-line utilities easier and faster. Some of them may be specific to my environment and workflow, but maybe someone finds a valuable nugget in there.
 
 ### Dependencies
@@ -9,6 +11,8 @@ These are some personal aliases, shortcuts, and extensions that make (my) work w
 * Bash
 * [inkarkat/shell-fields](https://github.com/inkarkat/shell-fields) for the `khal-streak` command's streak count filtering
 * [inkarkat/shell-debugging](https://github.com/inkarkat/shell-debugging) for debugging (optional)
+* [inkarkat/shell-testing](https://github.com/inkarkat/shell-testing) for automated tests
+* automated testing is done with _Bats_ - [Bash Automated Testing System](https://github.com/bats-core/bats-core)
 
 ### Installation
 
