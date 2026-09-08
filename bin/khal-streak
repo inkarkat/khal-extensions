@@ -1,6 +1,8 @@
 #!/bin/bash
 set -o pipefail
 
+${DEBUG:+eval $(debugtrace -o $- --envs ${!KHAL_*} \; -- "$@")}
+
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, they can
@@ -251,7 +253,7 @@ END {
 
 getStreaks()
 {
-    eval "$(${TEST:+testeval --point input-events --} "${TEST:-echo}" listEvents)" \
+    eval "$(${TEST:+testeval --point input-events --command} "${TEST:-echo}" listEvents)" \
 	"${matcher:+|}$matcher" \
 	| handleAllAndMultiDay \
 	| sortNewestAndShortestFirst \
@@ -305,4 +307,4 @@ readonly SEARCH_START="${KHAL_RANGE_START:-$ABSOLUTE_START}"
 readonly SEARCH_END="${KHAL_RANGE_END:-$ABSOLUTE_END}"
 unset KHAL_RANGE_START KHAL_RANGE_END
 
-eval "$(${TEST:+testeval --} "${TEST:-echo}" doStreak "$@")"
+eval "$(testeval -- "${TEST:-printf}" "${TEST:- %q}" doStreak "$@")"
